@@ -97,4 +97,7 @@ Planning:
         - Na meta final deverá ser entregue um relatório (pdf, também no zip). 
         O relatório compreenderá o conteúdo que for relevante para justificar o trabalho feito, deverá ser da exclusiva autoria dos membros do grupo. 
         Caso venha a ser divulgado, entretanto um guia de elaboração do relatório, então este deverá seguir as indicações dadas.
+
+        Meta 1:
+        Usar SigPipe (para quando um processo morre avisar o sistema, pra ser mais fácil debugging mais tarde)
 */
