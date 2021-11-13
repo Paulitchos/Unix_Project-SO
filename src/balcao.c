@@ -1,5 +1,5 @@
 #include "libraries.h"
-#include <stdio.h>
+#include "structs.h"
 
 int main(int argc, char **argv,  char *envp[]){
     printf("Ola eu sou o balcao\n");

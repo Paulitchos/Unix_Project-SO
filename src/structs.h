@@ -1,10 +1,7 @@
 #ifndef STRUCTS
 #define STRUCTS
 
-# include <unistd.h>
-# include <stdio.h>
-# include <stdlib.h>
-# include <string.h>
+#define WAIT_TIME 15
 
 typedef struct holy{
     int l;
