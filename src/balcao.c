@@ -1,11 +1,19 @@
 #include "libraries.h"
+#include <stdio.h>
 
-int main(int argc, char **argv){
+int main(int argc, char **argv,  char *envp[]){
     printf("Ola eu sou o balcao\n");
     printf("My PID is: %d\n", getpid());
-    printf("Numero de Argumentos: %d\nArgumentos:\n", argc);
-    for (int i = 0; i < argc; i++){
-        printf(" %s ", argv[i]);
+    char input[100];
+    fgets(input, 100, stdin);
+    printf("%s",input);
+    //sscanf()
+
+    char *pointer=envp[0];
+    int i=0;
+    while (pointer!=NULL){
+        printf("%s\n",envp[i]);
+        pointer=envp[++i];
     }
     return 0;
 }
