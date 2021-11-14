@@ -43,7 +43,6 @@ int main(int argc, char **argv,  char *envp[]){
         pointer=envp[++i];
     }
 
-
     // Pipe from ls to wc
     int res;
     int fd[2];
@@ -56,7 +55,7 @@ int main(int argc, char **argv,  char *envp[]){
     if (res == 0) { //FILHO
         close(STDIN_FILENO); // stdin é um FILE *, logo tens que usar STDOUT FILE NUMBER instead of 1
         /*Acede ao primeiro indice da seguinte tabela:
-            0      1       2    
+            0      1       2
         ┌──────┬───────┬───────┬────┬────┐
         │stdin │stdout |stderr │ <o resto está vazio>
         └──────┴───────┴───────┴────┴────┘ */   
@@ -72,7 +71,7 @@ int main(int argc, char **argv,  char *envp[]){
     dup(fd[1]); // duplica STDOUT para lugar recem liberto
     close(fd[1]); // ja tem o duplicado, não precisa este
     close(fd[0]); // não vai precisar de ler - fecha lado de leitura
-    execlp("./cliente","cliente",NULL); 
+    execlp("./cliente","cliente",NULL);
     perror("erro exec prog1: ");
     return 4;
 }
