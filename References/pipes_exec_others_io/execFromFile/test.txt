@@ -1,0 +1,5 @@
+wc funcionamento:
+wc sozinho, lê do stdin, podes mandar um EOF com CTRL + D para acabar
+
+output
+NºLinhas  NºPalavras  NºChars
