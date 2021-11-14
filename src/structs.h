@@ -3,11 +3,18 @@
 
 #define WAIT_TIME 15
 
-typedef struct holy{
-    int l;
-    int c;
-    int playtype;
-    struct holy *prox;
-}data, *pdata;
+# include "libraries.h"
+
+typedef struct cli{
+    char nome[100];
+    int nif; // maneira de o identificar
+}cliente, *pcliente;
+
+typedef struct med{
+    char nome[100];
+    int nif;
+    char especificacao[20];
+    bool disponivel; // perguntar se se pode utilizar
+}medico, *pmedico;
 
 #endif
