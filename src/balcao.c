@@ -1,5 +1,6 @@
 #include "libraries.h"
 #include "structs.h"
+#include <stdio.h>
 
 int main(int argc, char **argv,  char *envp[]){
     printf("Ola eu sou o balcao\n");
@@ -25,8 +26,13 @@ int main(int argc, char **argv,  char *envp[]){
 
     int res;
     close(1);
-    res = open(texto.txt, O_WRONLY | O_CREAT, 00600);
-    execlp("./../classificador", "classificador", NULL);
+        res = open("texto.txt", O_WRONLY | O_CREAT, 00600);
+        if (res == -1) {
+            perror("erro ficheiro: ");
+            return 2;
+        }
+    //execlp("./../classificador", "classificador", NULL);
+    execlp("ls", "ls", NULL);
     printf("Erro na execução");
     return 0;
 }
