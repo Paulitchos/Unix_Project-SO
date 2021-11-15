@@ -45,7 +45,7 @@ int main(int argc, char **argv,  char *envp[]){
 
     // Pipe from ls to wc
     int res;
-    int fd[2];
+    int fd[2]; // input, output
     pipe(fd);
     res = fork();
     if (res == 1) {
