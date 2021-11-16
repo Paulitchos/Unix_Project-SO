@@ -1,6 +1,8 @@
 #include "libraries.h"
 #include "structs.h"
+#include <cstring>
 #include <stdio.h>
+#include <unistd.h>
 
 // Corre só balcãocom:
 /*
@@ -66,13 +68,14 @@ int main(int argc, char **argv,  char *envp[]){
         //close(fd[0]); // ja tem o duplicado, podefechar este
         close(STDIN_FILENO); // não precisa do lado escrita - fecha
         dup(fd[0]);
-close(fd[0]);close(fd[1]);
+        close(fd[0]);
+        close(fd[1]);
 
 
-close(STDoOUT_FILENO); // não precisa do lado escrita - fecha
+        close(STDOUT_FILENO); // não precisa do lado escrita - fecha
         dup(df[1]);
-close(df[0]);close(df[1]);
-
+        close(df[0]);
+        close(df[1]);
 
 
         //char foo[4096];
@@ -84,20 +87,25 @@ close(df[0]);close(df[1]);
         perror("erro exec prog2: ");
         return 3;
     }
-   else{
+    else{
         //close(STDOUT_FILENO); // Fecha STDOUT
         //dup(fd[1]); // duplica STDOUT para lugar recem liberto 
 
        
-        close(fd[0)]; // ja tem o duplicado, não precisa este
-        close (df[1]]);
-do{       
-        write(fd[0],"doi-me a barriga\n",11);
-        tam = read(df[0],str_cpto,tam)
-
-        str_cpto[tam]="/0";
-}
-        
+        close(fd[0]); // ja tem o duplicado, não precisa este
+        close(df[1]);
+        int tam;
+        char str_cpto[20];
+        do{       
+            write(fd[0],"doi-me a barriga\n",strlen("doi-me a barriga\n")+1);
+            tam = read(df[0],str_cpto,tam);
+            str_cpto[tam] = '\0';
+        } while (true);    
         return 4;
     }
 }
+
+// no write o string lenght + 1 é por causo do \n ou do \0 ou outra coisa?
+// o scanf não retorna 1n no fim
+// o gets retorna \n sempre no fim
+// nós queremos que retorne o \n
