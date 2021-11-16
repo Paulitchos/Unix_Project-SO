@@ -1,6 +1,5 @@
 #include "libraries.h"
 #include "structs.h"
-#include <cstring>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -94,12 +93,12 @@ int main(int argc, char **argv,  char *envp[]){
        
         close(fd[0]); // ja tem o duplicado, não precisa este
         close(df[1]);
-        int tam;
-        char str_cpto[20];
+        int tam=20;
+        char str_xpto[20];
         do{       
-            write(fd[0],"doi-me a barriga\n",strlen("doi-me a barriga\n")+1);
-            tam = read(df[0],str_cpto,tam);
-            str_cpto[tam] = '\0';
+            write(fd[0],"doi-me a barriga\n",18); // df[0]?
+            tam = read(df[0],str_xpto,tam);     // fd[1]
+            str_xpto[tam] = '\0';
         } while (true);    
         return 4;
     }
