@@ -53,25 +53,34 @@ int main(int argc, char **argv,  char *envp[]){
         return 2;
     }
     if (res == 0) { //FILHO
-        close(STDIN_FILENO); // stdin é um FILE *, logo tens que usar STDOUT FILE NUMBER instead of 1
+         // stdin é um FILE *, logo tens que usar STDOUT FILE NUMBER instead of 1
         /*Acede ao primeiro indice da seguinte tabela:
             0      1       2
         ┌──────┬───────┬───────┬────┬────┐
         │stdin │stdout |stderr │ <o resto está vazio>
         └──────┴───────┴───────┴────┴────┘ */   
-        dup(fd[0]); // duplica lado leitura no lugar stdin
-        close(fd[0]); // ja tem o duplicado, podefechar este
+        //dup(fd[0]); // duplica lado leitura no lugar stdin
+        //close(fd[0]); // ja tem o duplicado, podefechar este
         close(fd[1]); // não precisa do lado escrita - fecha
+        dup2(fd[0],STDIN_FILENO);
+        //char foo[4096];
+        //int nbytes = read(fd[0], foo, sizeof(foo));
+        //printf("Output: (%.*s)\n", nbytes, foo);
+        //write(STDIN_FILENO, foo, strlen(foo)+1);
+        close(fd[0]);
         execlp("./../classificador", "classificador", NULL); // executa o prog2
         perror("erro exec prog2: ");
         return 3;
     }
+   else{
+        //close(STDOUT_FILENO); // Fecha STDOUT
+        //dup(fd[1]); // duplica STDOUT para lugar recem liberto 
 
-    close(STDOUT_FILENO); // Fecha STDOUT
-    dup(fd[1]); // duplica STDOUT para lugar recem liberto
-    close(fd[1]); // ja tem o duplicado, não precisa este
-    close(fd[0]); // não vai precisar de ler - fecha lado de leitura
-    execlp("./cliente","cliente",NULL);
-    perror("erro exec prog1: ");
-    return 4;
+        dup2(fd[1],STDOUT_FILENO); // stdout(2º argumento) -> fd[1]
+        close(fd[1]); // ja tem o duplicado, não precisa este
+        close(fd[0]); // não vai precisar de ler - fecha lado de leitura
+        execlp("./cliente","cliente",NULL);
+        perror("erro exec prog1: ");
+        return 4;
+    }
 }

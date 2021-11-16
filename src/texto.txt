@@ -1,7 +1,0 @@
-balcao
-balcao.c
-cliente.c
-libraries.h
-medico.c
-structs.h
-texto.txt

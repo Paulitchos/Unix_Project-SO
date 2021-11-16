@@ -10,9 +10,8 @@ int main(int argc, char **argv){
         printf(" %s ", argv[i]);
     }
     */
-    char frase[100] = {"dor"};
+    char frase[] = "estomago arde muito";
     //scanf("%s",frase);
-    printf("\n%s\n",frase);
-
+    printf("%s",frase);
     return 0;
 }
