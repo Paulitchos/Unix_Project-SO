@@ -1,6 +1,7 @@
 #include "libraries.h"
 #include "structs.h"
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 // Corre só balcãocom:
@@ -90,14 +91,18 @@ int main(int argc, char **argv,  char *envp[]){
         //close(STDOUT_FILENO); // Fecha STDOUT
         //dup(fd[1]); // duplica STDOUT para lugar recem liberto 
 
-       
         close(fd[0]); // ja tem o duplicado, não precisa este
         close(df[1]);
         int tam=20;
         char str_xpto[20];
+        char frase [20] = "doi-me a barriga\n";
         do{       
-            write(fd[0],"doi-me a barriga\n",18); // df[0]?
-            tam = read(df[0],str_xpto,tam);     // fd[1]
+            //printf("hello\n");
+            write(fd[1],frase,strlen(frase)+1); // df[0]?
+            read(df[0],str_xpto,sizeof(str_xpto));     // fd[1]
+            //write(balcaoToClassificador[0],frase,strlen(frase));
+            //read(balcaoToClassificador[1],resposta,strlen(resposta));
+            printf("%s",str_xpto);
             str_xpto[tam] = '\0';
         } while (true);    
         return 4;

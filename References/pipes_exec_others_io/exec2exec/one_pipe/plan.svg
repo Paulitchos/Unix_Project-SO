@@ -156,9 +156,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="1"
      inkscape:pageshadow="2"
-     inkscape:zoom="2.0000001"
-     inkscape:cx="1057.75"
-     inkscape:cy="115.5"
+     inkscape:zoom="5.6568544"
+     inkscape:cx="943.01526"
+     inkscape:cy="130.28442"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      inkscape:document-rotation="0"
@@ -607,16 +607,36 @@
        id="path3287" />
     <path
        style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
-       d="m 99.029387,41.734709 c -0.802614,0.629131 -2.87274,0.673552 -0.776791,1.734021"
-       id="path3289" />
-    <path
-       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
        d="m 58.321847,42.714366 c -3.755041,-1.741297 -6.164916,1.847691 -9.700911,1.847691"
        id="path3291" />
     <path
        style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
-       d="m 49.446532,43.248329 c -1.774915,1.141238 -2.70264,1.883249 -0.0038,2.557947"
-       id="path3293" />
+       d="m 114.12519,30.946517 c 0.23042,3.530063 1.22486,-0.572485 1.91701,-0.776542 0.0471,-0.01389 0.0243,1.83801 0.32263,2.050299 0.0342,0.02434 2.32585,-1.898198 2.57331,-2.02193"
+       id="path3456" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
+       d="m 119.51676,31.773837 c -2.16831,-0.301583 -2.34685,1.573213 0.26768,1.573213"
+       id="path3460" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
+       d="m 36.837556,33.584116 c 0.949452,-0.32794 1.148549,-0.301514 1.987521,-1.227375 2.611702,-2.88218 0.898115,-4.007322 -0.03538,-0.338035 -0.151341,0.594879 -0.119959,2.847221 1.077175,2.079522 0.960778,-0.616127 1.214114,-1.793637 1.760249,-2.700983 0.235262,-0.390866 0.378544,0.830352 0.581019,1.239165 0.230791,0.465979 0.602073,1.04905 0.768247,1.577142 0.08202,0.260638 -1.70262,1.237533 -0.774115,-0.504465"
+       id="path3462" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
+       d="m 68.901132,43.806825 c 4.86601,0 9.732021,0 14.598033,0"
+       id="path3577" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
+       d="m 83.346242,42.671014 c 0.530246,0.227065 0.909103,0.668189 1.453721,0.849733 1.21621,0.4054 -0.236617,0.547698 -0.701577,1.155036"
+       id="path3581" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
+       d="m 105.94276,38.811259 c 2.07341,0.862748 2.21192,0.501724 0.68879,1.644073"
+       id="path3856" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:0.264583;stroke-linecap:round;stroke-linejoin:round"
+       d="m 58.265126,41.914993 c 0.485592,0.899973 1.593273,1.488596 -0.327451,1.488596"
+       id="path3858" />
   </g>
   <script
      id="mesh_polyfill"
