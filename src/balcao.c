@@ -36,6 +36,7 @@ int main(int argc, char **argv,  char *envp[]){
 
 
     // Obter environment variables
+    // USAR getenv()
     char *pointer=envp[0];
     int i=0;
     while (pointer!=NULL){
@@ -47,6 +48,8 @@ int main(int argc, char **argv,  char *envp[]){
     int res;
     int fd[2]; // input, output
     pipe(fd);
+    int df[2]; // input, output
+    pipe(df);
     res = fork();
     if (res == 1) {
         perror("erro fork: ");
@@ -61,13 +64,22 @@ int main(int argc, char **argv,  char *envp[]){
         └──────┴───────┴───────┴────┴────┘ */   
         //dup(fd[0]); // duplica lado leitura no lugar stdin
         //close(fd[0]); // ja tem o duplicado, podefechar este
-        close(fd[1]); // não precisa do lado escrita - fecha
-        dup2(fd[0],STDIN_FILENO);
+        close(STDIN_FILENO); // não precisa do lado escrita - fecha
+        dup(fd[0]);
+close(fd[0]);close(fd[1]);
+
+
+close(STDoOUT_FILENO); // não precisa do lado escrita - fecha
+        dup(df[1]);
+close(df[0]);close(df[1]);
+
+
+
         //char foo[4096];
         //int nbytes = read(fd[0], foo, sizeof(foo));
         //printf("Output: (%.*s)\n", nbytes, foo);
         //write(STDIN_FILENO, foo, strlen(foo)+1);
-        close(fd[0]);
+        
         execlp("./../classificador", "classificador", NULL); // executa o prog2
         perror("erro exec prog2: ");
         return 3;
@@ -76,11 +88,16 @@ int main(int argc, char **argv,  char *envp[]){
         //close(STDOUT_FILENO); // Fecha STDOUT
         //dup(fd[1]); // duplica STDOUT para lugar recem liberto 
 
-        dup2(fd[1],STDOUT_FILENO); // stdout(2º argumento) -> fd[1]
-        close(fd[1]); // ja tem o duplicado, não precisa este
-        close(fd[0]); // não vai precisar de ler - fecha lado de leitura
-        execlp("./cliente","cliente",NULL);
-        perror("erro exec prog1: ");
+       
+        close(fd[0)]; // ja tem o duplicado, não precisa este
+        close (df[1]]);
+do{       
+        write(fd[0],"doi-me a barriga\n",11);
+        tam = read(df[0],str_cpto,tam)
+
+        str_cpto[tam]="/0";
+}
+        
         return 4;
     }
 }
