@@ -1,5 +1,8 @@
-#include <stdio.h>
 #include "structs.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 
 int main(int argc, char **argv){
     printf("Ola eu sou o servidor\n");

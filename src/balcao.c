@@ -1,10 +1,13 @@
 #include "structs.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <string.h>
 
 #define TAM 20
 
-// Corre só balcão com:
+// Run balcao:
 /*
     gcc ./src/balcao.c -o ./dist/balcao && ./dist/balcao
 */
@@ -39,6 +42,7 @@ int main(int argc, char **argv,  char *envp[]){
     printf("My PID is: %d\n", getpid());
     printf("MAXCLIENTES:%d\n",maxclientes);
     printf("MAXMEDICOS:%d\n",maxmedicos);
+
     
     int fres;
     int fd[2]; // input, output
@@ -74,14 +78,24 @@ int main(int argc, char **argv,  char *envp[]){
     else { // PARENT
         close(fd[0]); // has the duplicated, doesn't need this one
         close(df[1]);
+
         int tam=TAM;
-        char str_xpto[TAM];
-        char frase [TAM] = "doi-me a barriga\n";
-        do{       
-            write(fd[1],frase,strlen(frase)+1);   // write is waiting for amount of characters +1 for \0
-            tam = read(df[0],str_xpto,sizeof(str_xpto));
-            printf("%.*s",tam,str_xpto);   // todo what does %.*s do
-            str_xpto[tam] = '\0';
+        char phrase [TAM];
+        char *b = phrase;
+        size_t tam_phrase = TAM;
+        int chars;
+        chars = getline(&b,&tam_phrase,stdin);
+        // fgets(phrase, sizeof(phrase),stdin);
+
+        do{
+            write(fd[1],phrase,strlen(phrase)+1);   // write is waiting for amount of characters +1 for \0
+            // write uses strlen to not write unecessary data as we know all the data we want to write
+            tam = read(df[0],phrase,sizeof(phrase));   // tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
+            // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
+            phrase[tam] = '\0';
+
+            printf("%.*s",tam,phrase);
+
         } while (true);    
         return 4;
     }
@@ -89,7 +103,8 @@ int main(int argc, char **argv,  char *envp[]){
 
 
 // Perguntas ao Professor:
-//perguntar sobre o strlen + 1 ou o sizeof
+// what does %.*s do
+// perguntar sobre o strlen + 1 ou o sizeof
 // no write o string lenght + 1 é por causo do \n ou do \0 ou outra coisa?
 // o scanf não retorna \n no fim
 // o gets retorna \n sempre no fim

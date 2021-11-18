@@ -1,9 +1,9 @@
 #ifndef STRUCTS
 #define STRUCTS
 
-#define WAIT_TIME 15
+#include <stdbool.h>
 
-# include "libraries.h"
+#define WAIT_TIME 15
 
 typedef struct cli{
     char nome[100];

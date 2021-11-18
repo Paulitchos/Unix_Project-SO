@@ -9,5 +9,7 @@ int main(int argc, char*argv[],char *envp[]) {
     string[18] = '\0';
     string[6] = ' ';
     printf("%lu\t%lu", strlen(string), sizeof(string));
+    // sizeof string retorna o tamanho alocado para a string
+    // strlen retorna os bytes até chegar ao \0 (sem incluir o \0)
     return 0;
 } 
