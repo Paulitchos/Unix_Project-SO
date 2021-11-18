@@ -1,115 +1,96 @@
-#include "libraries.h"
 #include "structs.h"
 #include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 
-// Corre só balcãocom:
+#define TAM 20
+
+// Corre só balcão com:
 /*
-    gcc balcao.c -o balcao && ./balcao
+    gcc ./src/balcao.c -o ./dist/balcao && ./dist/balcao
 */
 
 void trata_sinal(int s) {
     static int a; 
     a++;
-    printf("Recebido sinal SIGPIPE %d ",a); // fflush(stdout);
-    /*
-    if (a == 5) {
-        printf("\naté logo ");
-        exit(0);
-    }
-    */
+    //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
+    printf("Recebido sinal SIGPIPE %d ",a); // fflush
 }
 
 int main(int argc, char **argv,  char *envp[]){
     setbuf(stdout, NULL);
     signal(SIGPIPE,trata_sinal);
+
+    // Get environment variables
+    char name[100];
+    int maxclientes;
+    int maxmedicos;
+    char *res_maxclientes = getenv("MAXCLIENTES");
+    char *res_maxmedicos = getenv("MAXMEDICOS");
+    if (res_maxclientes != NULL)
+        maxclientes = atoi(res_maxclientes);
+    else
+        maxclientes = 10;
+    if (res_maxmedicos != NULL)
+        maxmedicos = atoi(res_maxmedicos);
+    else
+        maxmedicos = 10;
+
     printf("Ola eu sou o balcao\n");
     printf("My PID is: %d\n", getpid());
-
-    char input[100];
-    //fgets(input, 100, stdin);
-    //printf("%s",input);
-    //sscanf()
-    //execlp("./../classificador", "classificador", input, NULL);
-
-    // To start another program without killing the current one
-    // we need to start a fork before execlp as the latter will destroy our process
-
-
-    // Obter environment variables
-    // USAR getenv()
-    char *pointer=envp[0];
-    int i=0;
-    while (pointer!=NULL){
-        //printf("%s\n",envp[i]);
-        pointer=envp[++i];
-    }
-
-    // Pipe from ls to wc
-    int res;
+    printf("MAXCLIENTES:%d\n",maxclientes);
+    printf("MAXMEDICOS:%d\n",maxmedicos);
+    
+    int fres;
     int fd[2]; // input, output
     pipe(fd);
-    int df[2]; // input, output
+    int df[2];
     pipe(df);
-    res = fork();
-    if (res == 1) {
+    fres = fork();
+    if (fres == 1) {
         perror("erro fork: ");
         return 2;
     }
-    if (res == 0) { //FILHO
-         // stdin é um FILE *, logo tens que usar STDOUT FILE NUMBER instead of 1
-        /*Acede ao primeiro indice da seguinte tabela:
+    if (fres == 0) { //CHILD
+        // doesn't need writing side - close
+        close(STDIN_FILENO); // stdin is a FILE *, thus you need to use STDIN_FILE_NUMBER instead of stdin
+        /*Accesses first element of the following table:
             0      1       2
         ┌──────┬───────┬───────┬────┬────┐
-        │stdin │stdout |stderr │ <o resto está vazio>
-        └──────┴───────┴───────┴────┴────┘ */   
-        //dup(fd[0]); // duplica lado leitura no lugar stdin
-        //close(fd[0]); // ja tem o duplicado, podefechar este
-        close(STDIN_FILENO); // não precisa do lado escrita - fecha
+        │stdin │stdout |stderr │ <rest is empty>
+        └──────┴───────┴───────┴────┴────┘ */
         dup(fd[0]);
         close(fd[0]);
         close(fd[1]);
 
-
-        close(STDOUT_FILENO); // não precisa do lado escrita - fecha
+        close(STDOUT_FILENO);
         dup(df[1]);
         close(df[0]);
         close(df[1]);
-
-
-        //char foo[4096];
-        //int nbytes = read(fd[0], foo, sizeof(foo));
-        //printf("Output: (%.*s)\n", nbytes, foo);
-        //write(STDIN_FILENO, foo, strlen(foo)+1);
         
-        execlp("./../classificador", "classificador", NULL); // executa o prog2
+        execlp("./classificador", "classificador", NULL); // executes calssificador
         perror("erro exec prog2: ");
         return 3;
     }
-    else{
-        //close(STDOUT_FILENO); // Fecha STDOUT
-        //dup(fd[1]); // duplica STDOUT para lugar recem liberto 
-
-        close(fd[0]); // ja tem o duplicado, não precisa este
+    else { // PARENT
+        close(fd[0]); // has the duplicated, doesn't need this one
         close(df[1]);
-        int tam=20;
-        char str_xpto[20];
-        char frase [20] = "doi-me a barriga\n";
+        int tam=TAM;
+        char str_xpto[TAM];
+        char frase [TAM] = "doi-me a barriga\n";
         do{       
-            //printf("hello\n");
-            write(fd[1],frase,strlen(frase)+1); // df[0]?
-            read(df[0],str_xpto,sizeof(str_xpto));     // fd[1]
-            //write(balcaoToClassificador[0],frase,strlen(frase));
-            //read(balcaoToClassificador[1],resposta,strlen(resposta));
-            printf("%s",str_xpto);
+            write(fd[1],frase,strlen(frase)+1);   // write is waiting for amount of characters +1 for \0
+            tam = read(df[0],str_xpto,sizeof(str_xpto));
+            printf("%.*s",tam,str_xpto);   // todo what does %.*s do
             str_xpto[tam] = '\0';
         } while (true);    
         return 4;
     }
 }
 
+
+// Perguntas ao Professor:
+//perguntar sobre o strlen + 1 ou o sizeof
 // no write o string lenght + 1 é por causo do \n ou do \0 ou outra coisa?
-// o scanf não retorna 1n no fim
+// o scanf não retorna \n no fim
 // o gets retorna \n sempre no fim
-// nós queremos que retorne o \n
+// nós queremos que retorne o \n para o classificador funcionar corretamente
