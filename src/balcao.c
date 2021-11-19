@@ -1,11 +1,13 @@
 #include "structs.h"
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <string.h>
+#include <limits.h>
 
-#define TAM 20
+#define TAM 50
 
 // Run balcao:
 /*
@@ -74,20 +76,21 @@ int main(int argc, char **argv,  char *envp[]){
         execlp("./classificador", "classificador", NULL); // executes calssificador
         perror("erro exec prog2: ");
         return 3;
-    }
-    else { // PARENT
+    } else { // PARENT
         close(fd[0]); // has the duplicated, doesn't need this one
         close(df[1]);
 
         int tam=TAM;
-        char phrase [TAM];
+        char phrase [PIPE_BUF];
         char *b = phrase;
-        size_t tam_phrase = TAM;
+        size_t tam_phrase = PIPE_BUF;
         int chars;
-        chars = getline(&b,&tam_phrase,stdin);
-        // fgets(phrase, sizeof(phrase),stdin);
+        // chars = getline(&b,&tam_phrase,stdin);
+        // fgets(phrase, sizeof(phrase),stdin);  //mete já o \n no final
+        // scanf não mete \n
 
         do{
+            chars = getline(&b,&tam_phrase,stdin);
             write(fd[1],phrase,strlen(phrase)+1);   // write is waiting for amount of characters +1 for \0
             // write uses strlen to not write unecessary data as we know all the data we want to write
             tam = read(df[0],phrase,sizeof(phrase));   // tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
@@ -95,7 +98,6 @@ int main(int argc, char **argv,  char *envp[]){
             phrase[tam] = '\0';
 
             printf("%.*s",tam,phrase);
-
         } while (true);    
         return 4;
     }
@@ -105,7 +107,6 @@ int main(int argc, char **argv,  char *envp[]){
 // Perguntas ao Professor:
 // what does %.*s do
 // perguntar sobre o strlen + 1 ou o sizeof
-// no write o string lenght + 1 é por causo do \n ou do \0 ou outra coisa?
 // o scanf não retorna \n no fim
 // o gets retorna \n sempre no fim
 // nós queremos que retorne o \n para o classificador funcionar corretamente
