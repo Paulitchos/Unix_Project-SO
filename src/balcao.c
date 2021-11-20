@@ -46,17 +46,17 @@ int main(int argc, char **argv,  char *envp[]){
     printf("MAXMEDICOS:%d\n",maxmedicos);
 
     
-    int fres;
+    int f_res;
     int fd[2]; // input, output
     pipe(fd);
     int df[2];
     pipe(df);
-    fres = fork();
-    if (fres == 1) {
+    f_res = fork();
+    if (f_res == 1) {
         perror("erro fork: ");
         return 2;
     }
-    if (fres == 0) { //CHILD
+    if (f_res == 0) { //CHILD
         // doesn't need writing side - close
         close(STDIN_FILENO); // stdin is a FILE *, thus you need to use STDIN_FILE_NUMBER instead of stdin
         /*Accesses first element of the following table:
@@ -80,24 +80,24 @@ int main(int argc, char **argv,  char *envp[]){
         close(fd[0]); // has the duplicated, doesn't need this one
         close(df[1]);
 
-        int tam=TAM;
-        char phrase [PIPE_BUF];
-        char *b = phrase;
-        size_t tam_phrase = PIPE_BUF;
-        int chars;
-        // chars = getline(&b,&tam_phrase,stdin);
-        // fgets(phrase, sizeof(phrase),stdin);  //mete já o \n no final
-        // scanf não mete \n
+        int tam = TAM;
+        char phrase_client [TAM];
+        char *p_phrase_client = phrase_client;
+        size_t tam_phrase_client = TAM;
 
         do{
-            chars = getline(&b,&tam_phrase,stdin);
-            write(fd[1],phrase,strlen(phrase));   // write is waiting for amount of characters +1 for \0
-            // write uses strlen to not write unecessary data as we know all the data we want to write
-            tam = read(df[0],phrase,sizeof(phrase));   // tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
-            // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
-            phrase[tam] = '\0';
+            getline(&p_phrase_client,&tam_phrase_client,stdin);
 
-            printf("%.*s",tam,phrase);
+            if(write(fd[1], phrase_client, strlen(phrase_client)) <= -1){ // write is waiting for amount of characters
+                printf("Error Writing\n"); return 1; }
+            // write uses strlen to not write unecessary data as we know all the data we want to write
+            
+            tam = read(df[0],phrase_client,sizeof(phrase_client));   // tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
+            if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
+            // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
+            phrase_client[tam] = '\0';
+
+            printf("%.*s",tam,phrase_client);
         } while (true);    
         return 4;
     }
