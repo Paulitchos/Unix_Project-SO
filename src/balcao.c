@@ -102,11 +102,3 @@ int main(int argc, char **argv,  char *envp[]){
         return 4;
     }
 }
-
-
-// Perguntas ao Professor:
-// what does %.*s do
-// perguntar sobre o strlen + 1 ou o sizeof
-// o scanf não retorna \n no fim
-// o gets retorna \n sempre no fim
-// nós queremos que retorne o \n para o classificador funcionar corretamente
