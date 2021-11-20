@@ -91,7 +91,7 @@ int main(int argc, char **argv,  char *envp[]){
 
         do{
             chars = getline(&b,&tam_phrase,stdin);
-            write(fd[1],phrase,strlen(phrase)+1);   // write is waiting for amount of characters +1 for \0
+            write(fd[1],phrase,strlen(phrase));   // write is waiting for amount of characters +1 for \0
             // write uses strlen to not write unecessary data as we know all the data we want to write
             tam = read(df[0],phrase,sizeof(phrase));   // tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
             // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
