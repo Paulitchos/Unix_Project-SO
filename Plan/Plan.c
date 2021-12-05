@@ -100,4 +100,9 @@ Planning:
 
         Meta 1:
         Usar SigPipe (para quando um processo morre avisar o sistema, pra ser mais fácil debugging mais tarde)
+
+
+        Notes:
+        Usar sizeof para estruturas
+        usar strlen para strings //Nao misturar
 */

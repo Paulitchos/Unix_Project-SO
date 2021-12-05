@@ -82,17 +82,18 @@ int main(int argc, char **argv,  char *envp[]){
 
         int tam = TAM;
         char phrase_client [TAM];
-        char *p_phrase_client = phrase_client;
-        size_t tam_phrase_client = TAM;
 
         do{
-            getline(&p_phrase_client,&tam_phrase_client,stdin);
+            tam = read(STDIN_FILENO,phrase_client,sizeof(phrase_client)); // read from user
+            if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
+            phrase_client[tam] = '\0';
 
-            if(write(fd[1], phrase_client, strlen(phrase_client)) <= -1){ // write is waiting for amount of characters
-                printf("Error Writing\n"); return 1; }
+            if(write(fd[1], phrase_client, strlen(phrase_client)) <= -1){ // write to pipe, write is waiting for amount of characters
+                printf("Error Writing\n")
+                ; return 1; }
             // write uses strlen to not write unecessary data as we know all the data we want to write
             
-            tam = read(df[0],phrase_client,sizeof(phrase_client));   // tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
+            tam = read(df[0],phrase_client,sizeof(phrase_client)); // read from pipe, tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
             if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
             // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
             phrase_client[tam] = '\0';
