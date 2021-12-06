@@ -1,7 +1,6 @@
 #include "dict.h"
 
-int	main(void)
-{
+int	main(void){
 	int	s_fifo_fd;	/* identificador do FIFO do servidor */
 	int	c_fifo_fd;	/* identificador do FIFO do cliente */
 	pergunta_t	perg;	/* mensagem do tipo "pergunta_t" */
@@ -12,8 +11,7 @@ int	main(void)
 	/* cria o FIFO deste cliente */
 	perg.pid_cliente = getpid();
 	sprintf(c_fifo_fname, CLIENT_FIFO, perg.pid_cliente);
-	if (mkfifo(c_fifo_fname, 0777) == -1)
-	{
+	if (mkfifo(c_fifo_fname, 0777) == -1){
 		perror("\nmkfifo FIFO cliente deu erro");
 		exit(EXIT_FAILURE);
 	}
@@ -21,8 +19,7 @@ int	main(void)
 
 	/* abre o FIFO do servidor para escrita */
 	s_fifo_fd = open(SERVER_FIFO, O_WRONLY); /* bloqueante */
-	if (s_fifo_fd == -1)
-	{
+	if (s_fifo_fd == -1){
 		fprintf(stderr, "\nO servidor não está a correr\n");
 		unlink(c_fifo_fname);
 		exit(EXIT_FAILURE);
@@ -31,11 +28,10 @@ int	main(void)
 
 	/* abertura read+write -> evita o comportamento de ficar	*/
 	/* bloqueado no open. a execução prossegue logo mas as		*/
-	/* operações read/write (neste caso APENAS READ)					*/
-	/* continuam bloqueantes (mais fácil)											*/
+	/* operações read/write (neste caso APENAS READ)			*/
+	/* continuam bloqueantes (mais fácil)						*/
 	c_fifo_fd = open(c_fifo_fname, O_RDWR);	/* bloqueante */
-	if (c_fifo_fd == -1)
-	{
+	if (c_fifo_fd == -1){
 		perror("\nErro ao abrir o FIFO do cliente");
 		close(s_fifo_fd);
 		unlink(c_fifo_fname);
@@ -45,8 +41,7 @@ int	main(void)
 
 	memset(perg.palavra, '\0', TAM_MAX);
 
-	while (1)
-	{
+	while (1){
 		/* "fim" para terminar cliente */
 		/* ---- a) OBTÉM PERGUNTA ---- */
 		printf("\nPalavra a traduzir -> ");

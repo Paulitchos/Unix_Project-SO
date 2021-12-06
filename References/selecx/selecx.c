@@ -34,27 +34,23 @@ int main(int arcg, char * argv[]){
     signal(SIGINT, trataCC); // para interroper via ^C
 
     //cria pipes
-    mkfifo("pipe_a",00777);
+    mkfifo("pipe_a",00777); // todo what is 00777
     mkfifo("pipe_b",00777);
 
     //abre os pipes. RDRW vs RD -notar isto
     fd_a = open("pipe_a",O_RDWR | O_NONBLOCK);
-
-    if(fd_a == -1)
-        sayThisAndExit("ERRO no open pipe fd_a");
-
-    fd_b = open("pipe_b",O_RDWR | O_NONBLOCK);
-
-    if(fd_a == -1)
-        sayThisAndExit("ERRO no open pipe fd_b");
+    if(fd_a == -1) sayThisAndExit("ERRO no open pipe fd_a");
         
+    fd_b = open("pipe_b",O_RDWR | O_NONBLOCK);
+    if(fd_a == -1) sayThisAndExit("ERRO no open pipe fd_b");
+        
+    tv.tv_sec = 10; //segundos (10 = apenas um exemplo)  // todo não precisa de estar dentro do while (1) pois não
+    tv.tv_usec = 0; //micro-segundos (se ambos a 0 então faz polling) // todo polling?
+
     while (1){
         
-        tv.tv_sec = 10; //segundos (10 = apenas um exemplo)
-        tv.tv_usec = 0; //micro-segundos (se ambos a 0 então faz polling)
-        
-        FD_ZERO(& read_fds); //inicializa conjunto de fd (watch list)
-        FD_SET(0,& read_fds); //adiciona stdin ao conj de fd a observar
+        FD_ZERO(& read_fds); //inicializa conjunto de fd (watch list) // todo o quê que isto é, define? E ali em baixo
+        FD_SET(STDIN_FILENO,& read_fds); //adiciona stdin ao conj de fd a observar
         FD_SET(fd_a,& read_fds); //adiciona pipe_a ao conj de fd a observar
         FD_SET(fd_b,& read_fds); //adiciona pipe_b ao conj de fd a observar
 
@@ -62,7 +58,7 @@ int main(int arcg, char * argv[]){
         //bloqueia ate: sinal, timeout, há dados para ler EOF, exception
         
         nfd = select(           //bloqueia até haver dados ou EOF no read-set
-            max(fd_a,fd_b)+1,   //max valor dos vários fd + 1
+            max(fd_a,fd_b)+1,   //max valor dos vários fd + 1  // todo what is max for
             & read_fds,         //read fd set
             NULL,               //write fd set- (nenhum aqui)
             NULL,               //exeception fd set- (nenhum aqui)
@@ -70,7 +66,7 @@ int main(int arcg, char * argv[]){
             // actualiza tv -> quanto tempo faltava para o timeout
     
         if(nfd == 0) {
-            printf("\n(Estou a espera....)\n"); fflush(stdout);
+            printf("\n(Estou a espera....)\n"); fflush(stdout);  // todo what is fflush(stdout) for
             continue;
         }
 
@@ -81,7 +77,7 @@ int main(int arcg, char * argv[]){
             return EXIT_FAILURE;
         }
         
-        if (FD_ISSET(0, & read_fds)) { // stdin tem algo para ler?
+        if (FD_ISSET(STDIN_FILENO, & read_fds)) { // stdin tem algo para ler? // todo o quê que isto é, define?
             trataTeclado();
             // sem "contenue" -> não vai logo para a próxima iterção
         }   // porque pode ser que pipe_a ou pipe_b tembém tenham algo
@@ -95,7 +91,7 @@ int main(int arcg, char * argv[]){
             leEMostraPipes("B", fd_b);
             // ocódigo dentro do ciclo acaba jáa a seguir e volta a esperar por dados
         }
-    }    
+    }
 
     // em prencípio, neste exemplo, não deve chegar aqui
     return EXIT_SUCCESS;
@@ -110,7 +106,7 @@ void leEMostraPipes(char * quem, int fd){
         buffer[strlen(buffer)-1] = '\0';
     printf("\n%s: (%d bytes) [%s]\n", quem, bytes, buffer);
     if (strcmp(buffer, "sair")==0) {
-        unlink("pipe_a"); unlink("pipe_b");
+        unlink("pipe_a"); unlink("pipe_b");  //todo, não é preciso fazer close()? Quando é que é preciso unlink e quando é que é preciso close()?
         exit(EXIT_SUCCESS);
     }
 }
@@ -130,7 +126,7 @@ void trataTeclado() {
 }
 
 void sayThisAndExit(char * p){
-    perror(p);
+    perror(p);   //todo perror faz algum log? stderr?
     exit(EXIT_FAILURE);
 }
 
@@ -139,7 +135,7 @@ int max(int a, int b){
 }
 
 void trataCC(int s){
-    unlink("pipee_a"); unlink("pipe_b");
+    unlink("pipe_a"); unlink("pipe_b");
     printf("\n ->CC<- \n\n");
     exit(EXIT_SUCCESS);
 }

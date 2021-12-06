@@ -46,7 +46,7 @@ int main(int argc, char **argv,  char *envp[]){
     printf("MAXMEDICOS:%d\n",maxmedicos);
 
     int f_res;
-    int fd[2]; // input, output
+    int fd[2]; // file descriptor | input, output
     pipe(fd);
     int df[2];
     pipe(df);
