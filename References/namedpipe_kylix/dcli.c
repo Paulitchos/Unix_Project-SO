@@ -5,7 +5,7 @@ int	main(void){
 	int	c_fifo_fd;	/* identificador do FIFO do cliente */
 	pergunta_t	perg;	/* mensagem do tipo "pergunta_t" */
 	resposta_t	resp;	/* mensagem do tipo "resposta_t" */
-	char	c_fifo_fname[25];	/* nome do FIFO deste cliente */
+	char c_fifo_fname[25];	/* nome do FIFO deste cliente */
 	int	read_res;
 
 	/* cria o FIFO deste cliente */

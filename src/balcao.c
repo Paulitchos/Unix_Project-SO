@@ -1,11 +1,5 @@
 #include "structs.h"
-#include <linux/limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
-#include <string.h>
-#include <limits.h>
+#include "globals.h"
 
 #define TAM 50
 
