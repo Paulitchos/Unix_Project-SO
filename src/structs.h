@@ -6,8 +6,9 @@
 #define WAIT_TIME 15
 
 typedef struct cli{
-    char nome[100];
-    int nif[9]; // maneira de o identificar
+    char nome[50];
+    int pid; // maneira de o identificar
+    char sintomas[100];
 }cliente, *pcliente;
 
 typedef struct med{

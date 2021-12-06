@@ -17,7 +17,7 @@ int	s_fifo_fd, c_fifo_fd;
 /* Esta função vai atender o sinal SIGINT para terminar o servidor */
 void	trataSig(int i)
 {
-	(void) i;
+	(void) i;    // todo what?
 	fprintf(stderr, "\nServidor de dicionário a terminar "
 									"(interrompido via teclado)\n\n");
 	close(s_fifo_fd);

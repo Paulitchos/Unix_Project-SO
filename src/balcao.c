@@ -3,23 +3,52 @@
 
 #define TAM 50
 
+char* dicionario[7][2] = {
+	{"memory", "memória"},
+	{"computer","computador"},
+	{"close","fechar"},
+	{"open","abrir"},
+	{"read","ler"},
+	{"write","escrever"},
+	{"file","ficheiro"}};
+
+int	s_fifo_fd, c_fifo_fd;
+
 // Run balcao:
 /*
     gcc ./src/balcao.c -o ./dist/balcao && ./dist/balcao
 */
 
-void trata_sinal(int s) {
+void trata_SIGPIPE(int s) {
     static int a; 
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
     printf("Recebido sinal SIGPIPE %d ",a); // fflush
 }
 
+void trata_SIGINT(int i) { // CTRL + C
+	(void) i;    //todo what?
+	fprintf(stderr, "\nServidor de dicionário a terminar "
+									"(interrompido via teclado)\n\n");
+	close(s_fifo_fd);
+	unlink(SERVER_FIFO);
+	exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char **argv,  char *envp[]){
     setbuf(stdout, NULL);
-    signal(SIGPIPE,trata_sinal);
+    // ============== Treat Signals ==============
+    if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
+        perror("\nWARNING: Não foi possível configurar sinal SIGPIPE\n");
+    fprintf(stderr, "\nSinal SIGPIPE configurado");
+    if (signal(SIGINT,trata_SIGINT) == SIG_ERR) {
+        perror("\nNão foi possível configurar sinal SIGINT!\n");
+        exit(EXIT_FAILURE); }
+    fprintf(stderr, "\nSinal SIGINT configurado");
+    // ============== ==============
 
-    // Get environment variables
+    /*
+    // ============== Get environment variables ==============
     char name[100];
     int maxclientes;
     int maxmedicos;
@@ -33,6 +62,7 @@ int main(int argc, char **argv,  char *envp[]){
         maxmedicos = atoi(res_maxmedicos);
     else
         maxmedicos = 10;
+    // ============== ============== ============== 
 
     printf("Ola eu sou o balcao\n");
     printf("My PID is: %d\n", getpid());
@@ -49,14 +79,15 @@ int main(int argc, char **argv,  char *envp[]){
         perror("erro fork: ");
         return 2;
     }
+    
     if (f_res == 0) { //CHILD
         // doesn't need writing side - close
         close(STDIN_FILENO); // stdin is a FILE *, thus you need to use STDIN_FILE_NUMBER instead of stdin
-        /*Accesses first element of the following table:
-            0      1       2
-        ┌──────┬───────┬───────┬────┬────┐
-        │stdin │stdout |stderr │ <rest is empty>
-        └──────┴───────┴───────┴────┴────┘ */
+        // Accesses first element of the following table:
+        //     0      1       2
+        // ┌──────┬───────┬───────┬────┬────┐
+        // │stdin │stdout |stderr │ <rest is empty>
+        // └──────┴───────┴───────┴────┴────┘ 
         dup(fd[0]);
         close(fd[0]);
         close(fd[1]);
@@ -95,4 +126,88 @@ int main(int argc, char **argv,  char *envp[]){
         } while (true);    
         return 4;
     }
+    */
+
+    // ===========================
+    pergunta_t	perg;
+	resposta_t	resp;
+
+	int	res;
+	int	i;
+	char	c_fifo_fname[50];
+	printf("\nServidor de dicionário");
+
+	res = mkfifo(SERVER_FIFO, 0777);
+	if (res == -1)
+	{
+		perror("\nmkfifo do FIFO do servidor deu erro");
+		exit(EXIT_FAILURE);
+	}
+	fprintf(stderr, "\nFIFO servidor criado");
+
+	/* prepara FIFO do servidor */
+	/* abertura read+write -> evita o comportamento de ficar	*/
+	/* bloqueado no open. a execução prossegue e as						*/
+	/* operações read/write (neste caso apenas READ)					*/
+	/* continuam bloqueantes (mais fácil de gerir)						*/
+	s_fifo_fd = open(SERVER_FIFO, O_RDWR);
+	if (s_fifo_fd == -1)
+	{
+		perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)");
+		exit(EXIT_FAILURE);
+	}
+	fprintf(stderr, "\nFIFO aberto para READ (+WRITE) bloqueante");
+	
+	/* ciclo principal: read pedido -> write resposta -> repete */
+	while (1) /* sai via SIGINT */
+	{
+		/* ---- OBTEM PERGUNTA ---- */
+		res = read(s_fifo_fd, &perg, sizeof(perg));
+		if (res < (int) sizeof(perg))
+		{
+			fprintf(stderr, "\nRecebida pergunta incompleta "
+											"[bytes lidos: %d]", res);
+			continue; /* não responde a cliente (qual cliente?) */
+		}
+		fprintf(stderr, "\nRecebido [%s]", perg.palavra);
+
+		/* ---- PROCURA TRADUÇÃO ---- */
+		strcpy(resp.palavra, "DESCONHECIDO"); /* caso não encontre */
+		for (i = 0; i < (int)7; i++)
+		{
+			if (!strcasecmp(perg.palavra, dicionario[i][0]))
+			{
+				strcpy(resp.palavra, dicionario[i][1]);
+				break;
+			}
+		}
+		fprintf(stderr, "\nResposta = [%s]", resp.palavra);
+
+		/* ---- OBTÉM FILENAME DO FIFO PARA A RESPOSTA ---- */
+		sprintf(c_fifo_fname, CLIENT_FIFO, perg.pid_cliente);
+
+		/* ---- ABRE O FIFO do cliente p/ write ---- */
+		c_fifo_fd = open(c_fifo_fname, O_WRONLY);
+		if (c_fifo_fd == -1)
+			perror("\nErro no open - Ninguém quis a resposta");
+		else
+		{
+			fprintf(stderr, "\nFIFO cliente aberto para WRITE");
+
+			/* ---- ENVIA RESPOSTA ---- */
+			res = write(c_fifo_fd, &resp, sizeof(resp));
+			if (res == sizeof(resp))
+				fprintf(stderr, "\nescreveu a resposta");
+			else
+				perror("\nerro a escrever a resposta");
+
+			close(c_fifo_fd); /* FECHA LOGO O FIFO DO CLIENTE! */
+			fprintf(stderr, "\nFIFO cliente fechado");
+		}
+	} /* fim do ciclo principal do servidor */
+
+	/* em princípio não chega a este ponto - sai via SIGINT */
+	close(s_fifo_fd);
+	unlink(SERVER_FIFO);
+	return (0);
 }
