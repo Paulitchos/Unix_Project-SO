@@ -45,7 +45,6 @@ int main(int argc, char **argv,  char *envp[]){
     printf("MAXCLIENTES:%d\n",maxclientes);
     printf("MAXMEDICOS:%d\n",maxmedicos);
 
-    
     int f_res;
     int fd[2]; // input, output
     pipe(fd);
