@@ -3,51 +3,46 @@
 
 
 int main(int argc, char **argv){
-    /*
-    printf("Ola eu sou o cliente\n");
-    printf("My PID is: %d\n", getpid());
-    printf("Numero de Argumentos: %d\nArgumentos:\n", argc);
-    for (int i = 0; i < argc; i++){
-        printf(" %s ", argv[i]);
-    }
-    */
-    cliente infor;
+
+    fromCliente fcli;
+    toCliente tcli;
     int tam;
 
-    if (argc != 2){
+    if (argc != 2){                                     //caso tenho mais que um argumento
         printf("Deve introduzir apenas o seu nome\n");
         printf("Exemplo ./cliente <nome>\n");
         exit(EXIT_SUCCESS);
     }
      
-    sscanf(argv[1], "%s", &infor.nome);
-        
-    printf("%s\n",infor.nome);
+    sscanf(argv[1], "%s", &fcli.nome); // vai buscar ao argv[1] o nome do cliente
 
-    infor.pid = getpid();
-    printf("My PID is: %d\n", infor.pid);
+    printf("%s\n",fcli.nome);
+
+    fcli.pid_cliente = getpid(); // guarda na struct fromCliente o PID único de casa cliente
+    printf("My PID is: %d\n", fcli.pid_cliente);
 
     printf("Quais sao os seus sintomas?\n");
 
-    tam = read(STDIN_FILENO,infor.sintomas,sizeof(infor.sintomas)); // read from user
+    tam = read(STDIN_FILENO,fcli.sintomas,sizeof(fcli.sintomas)); // read from user
     if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
-    infor.sintomas[tam] = '\0';
+    fcli.sintomas[tam] = '\0';
 
-    printf("\n%s\n",infor.sintomas);
-	return (0);
-  
-    exit(0);
+    printf("\n%s\n",fcli.sintomas);
+
+
+    //sprintf(c_fifo_fname, CLIENT_FIFO, fcli.pid_cliente); // atualiza o nome do fifo deste cliente
+
     // ===========================
-    int	s_fifo_fd;	/* identificador do FIFO do servidor */
-	int	c_fifo_fd;	/* identificador do FIFO do cliente */
-	pergunta_t	perg;	/* mensagem do tipo "pergunta_t" */
-	resposta_t	resp;	/* mensagem do tipo "resposta_t" */
+    int	npb;	/* identificador do FIFO do servidor */
+	int	npc;	/* identificador do FIFO do cliente */
+	//pergunta_t fcli;	/* mensagem do tipo "pergunta_t" */
+	//resposta_t	resp;	/* mensagem do tipo "resposta_t" */
 	char c_fifo_fname[25];	/* nome do FIFO deste cliente */
 	int	read_res;
 
 	/* cria o FIFO deste cliente */
-	perg.pid_cliente = getpid();
-	sprintf(c_fifo_fname, CLIENT_FIFO, perg.pid_cliente);
+	fcli.pid_cliente = getpid();
+	sprintf(c_fifo_fname, CLIENT_FIFO, fcli.pid_cliente);
 	if (mkfifo(c_fifo_fname, 0777) == -1){
 		perror("\nmkfifo FIFO cliente deu erro");
 		exit(EXIT_FAILURE);
@@ -55,8 +50,8 @@ int main(int argc, char **argv){
 	fprintf(stderr, "\nFIFO do cliente criado");
 
 	/* abre o FIFO do servidor para escrita */
-	s_fifo_fd = open(SERVER_FIFO, O_WRONLY); /* bloqueante */
-	if (s_fifo_fd == -1){
+	npb = open(SERVER_FIFO, O_WRONLY); /* bloqueante */
+	if (npb == -1){
 		fprintf(stderr, "\nO servidor não está a correr\n");
 		unlink(c_fifo_fname);
 		exit(EXIT_FAILURE);
@@ -67,38 +62,38 @@ int main(int argc, char **argv){
 	/* bloqueado no open. a execução prossegue logo mas as		*/
 	/* operações read/write (neste caso APENAS READ)			*/
 	/* continuam bloqueantes (mais fácil)						*/
-	c_fifo_fd = open(c_fifo_fname, O_RDWR);	/* bloqueante */
-	if (c_fifo_fd == -1){
+	npc = open(c_fifo_fname, O_RDWR);	/* bloqueante */
+	if (npc == -1){
 		perror("\nErro ao abrir o FIFO do cliente");
-		close(s_fifo_fd);
+		close(npb);
 		unlink(c_fifo_fname);
 		exit(EXIT_FAILURE);
 	}
 	fprintf(stderr, "\nFIFO do cliente aberto para READ (+WRITE) BLOCK");
 
-	memset(perg.palavra, '\0', TAM_MAX);
+	memset(fcli.sintomas, '\0', TAM_MAX);
 
 	while (1){
 		/* "fim" para terminar cliente */
-		/* ---- a) OBTÉM PERGUNTA ---- */
+		/* ---- a) OBTÉM fcliUNTA ---- */
 		printf("\nPalavra a traduzir -> ");
-		scanf("%s", perg.palavra);
-		if (!strcasecmp(perg.palavra, "fim"))
+		scanf("%s", fcli.sintomas);
+		if (!strcasecmp(fcli.sintomas, "fim"))
 			break;
 
-		/* ---- b) ENVIA A PERGUNTA ---- */
-		write(s_fifo_fd, &perg, sizeof(perg));
+		/* ---- b) ENVIA A fcliUNTA ---- */
+		write(npb, &fcli, sizeof(fcli));
 		/* ---- c) OBTÉM A RESPOSTA ---- */
-		read_res = read(c_fifo_fd, &resp, sizeof(resp));
-		if (read_res == sizeof(resp))
-			printf("\nTradução -> %s", resp.palavra);
+		read_res = read(npc, &tcli, sizeof(tcli));
+		if (read_res == sizeof(tcli))
+			printf("\nTradução -> %s", tcli.msg);
 		else
 			printf("\nSem resposta ou resposta incompreensível"
 						"[bytes lidos: %d]", read_res);
 	}
 
-	close(c_fifo_fd);
-	close(s_fifo_fd);
+	close(npc);
+	close(npb);
 	unlink(c_fifo_fname);
 
 	return (0);

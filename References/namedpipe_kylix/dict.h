@@ -22,7 +22,7 @@
 
 /* estrutura de mensagem correspondente a um pedido cliente -> servidor*/
 typedef struct {
-	pid_t	pid_cliente;
+	pid_t	pid_cliente;  //todo pid_t?
 	char	palavra[TAM_MAX];
 } pergunta_t;
 

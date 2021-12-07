@@ -5,19 +5,26 @@
 
 #define WAIT_TIME 15
 
-typedef struct cli{
+typedef struct fcli{
     char nome[50];
-    int pid; // maneira de o identificar
+    pid_t pid_cliente; // maneira de o identificar
     char sintomas[100];
-}cliente, *pcliente;
+}fromCliente, *pfromCliente;
+
+typedef struct tcli{
+	char msg[50];
+}toCliente, *ptoCliente;
 
 typedef struct med{
     char nome[100];
     int nif;
     char especificacao[20];
-    bool disponivel; // perguntar se se pode utilizar
+    bool disponivel; // perguntar se pode utilizar
 }medico, *pmedico;
 
+
+
+// tmp
 /* estrutura de mensagem correspondente a um pedido cliente -> servidor*/
 typedef struct {
 	pid_t	pid_cliente;

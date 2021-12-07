@@ -12,7 +12,7 @@ char* dicionario[7][2] = {
 	{"write","escrever"},
 	{"file","ficheiro"}};
 
-int	s_fifo_fd, c_fifo_fd;
+int	npb, npc;
 
 // Run balcao:
 /*
@@ -30,7 +30,7 @@ void trata_SIGINT(int i) { // CTRL + C
 	(void) i;    //todo what?
 	fprintf(stderr, "\nServidor de dicionário a terminar "
 									"(interrompido via teclado)\n\n");
-	close(s_fifo_fd);
+	close(npb);
 	unlink(SERVER_FIFO);
 	exit(EXIT_SUCCESS);
 }
@@ -129,8 +129,8 @@ int main(int argc, char **argv,  char *envp[]){
     */
 
     // ===========================
-    pergunta_t	perg;
-	resposta_t	resp;
+    fromCliente	fcli;
+	toCliente tcli;
 
 	int	res;
 	int	i;
@@ -145,13 +145,13 @@ int main(int argc, char **argv,  char *envp[]){
 	}
 	fprintf(stderr, "\nFIFO servidor criado");
 
-	/* prepara FIFO do servidor */
-	/* abertura read+write -> evita o comportamento de ficar	*/
-	/* bloqueado no open. a execução prossegue e as						*/
-	/* operações read/write (neste caso apenas READ)					*/
-	/* continuam bloqueantes (mais fácil de gerir)						*/
-	s_fifo_fd = open(SERVER_FIFO, O_RDWR);
-	if (s_fifo_fd == -1)
+	// prepara FIFO do servidor
+	// abertura read+write -> evita o comportamento de ficar
+	// bloqueado no open. a execução prossegue e as		
+	// operações read/write (neste caso apenas READ)		
+	// continuam bloqueantes (mais fácil de gerir)			
+	npb = open(SERVER_FIFO, O_RDWR);
+	if (npb == -1)
 	{
 		perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)");
 		exit(EXIT_FAILURE);
@@ -162,52 +162,52 @@ int main(int argc, char **argv,  char *envp[]){
 	while (1) /* sai via SIGINT */
 	{
 		/* ---- OBTEM PERGUNTA ---- */
-		res = read(s_fifo_fd, &perg, sizeof(perg));
-		if (res < (int) sizeof(perg))
+		res = read(npb, &fcli, sizeof(fcli));
+		if (res < (int) sizeof(fcli))
 		{
 			fprintf(stderr, "\nRecebida pergunta incompleta "
 											"[bytes lidos: %d]", res);
 			continue; /* não responde a cliente (qual cliente?) */
 		}
-		fprintf(stderr, "\nRecebido [%s]", perg.palavra);
+		fprintf(stderr, "\nRecebido [%s]", fcli.sintomas);
 
 		/* ---- PROCURA TRADUÇÃO ---- */
-		strcpy(resp.palavra, "DESCONHECIDO"); /* caso não encontre */
+		strcpy(tcli.msg, "DESCONHECIDO"); /* caso não encontre */
 		for (i = 0; i < (int)7; i++)
 		{
-			if (!strcasecmp(perg.palavra, dicionario[i][0]))
+			if (!strcasecmp(fcli.sintomas, dicionario[i][0]))
 			{
-				strcpy(resp.palavra, dicionario[i][1]);
+				strcpy(tcli.msg, dicionario[i][1]);
 				break;
 			}
 		}
-		fprintf(stderr, "\nResposta = [%s]", resp.palavra);
+		fprintf(stderr, "\nResposta = [%s]", tcli.msg);
 
 		/* ---- OBTÉM FILENAME DO FIFO PARA A RESPOSTA ---- */
-		sprintf(c_fifo_fname, CLIENT_FIFO, perg.pid_cliente);
+		sprintf(c_fifo_fname, CLIENT_FIFO, fcli.pid_cliente);
 
 		/* ---- ABRE O FIFO do cliente p/ write ---- */
-		c_fifo_fd = open(c_fifo_fname, O_WRONLY);
-		if (c_fifo_fd == -1)
+		npc = open(c_fifo_fname, O_WRONLY);
+		if (npc == -1)
 			perror("\nErro no open - Ninguém quis a resposta");
 		else
 		{
 			fprintf(stderr, "\nFIFO cliente aberto para WRITE");
 
 			/* ---- ENVIA RESPOSTA ---- */
-			res = write(c_fifo_fd, &resp, sizeof(resp));
-			if (res == sizeof(resp))
+			res = write(npc, &tcli, sizeof(tcli));
+			if (res == sizeof(tcli))
 				fprintf(stderr, "\nescreveu a resposta");
 			else
 				perror("\nerro a escrever a resposta");
 
-			close(c_fifo_fd); /* FECHA LOGO O FIFO DO CLIENTE! */
+			close(npc); /* FECHA LOGO O FIFO DO CLIENTE! */
 			fprintf(stderr, "\nFIFO cliente fechado");
 		}
 	} /* fim do ciclo principal do servidor */
 
 	/* em princípio não chega a este ponto - sai via SIGINT */
-	close(s_fifo_fd);
+	close(npb);
 	unlink(SERVER_FIFO);
 	return (0);
 }
