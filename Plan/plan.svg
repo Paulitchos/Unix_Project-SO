@@ -273,9 +273,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="1"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.5"
-     inkscape:cx="1057"
-     inkscape:cy="1000"
+     inkscape:zoom="0.70710678"
+     inkscape:cx="1174.5044"
+     inkscape:cy="1032.3759"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      inkscape:document-rotation="0"
@@ -946,11 +946,11 @@
          sodipodi:role="line"
          x="-7.5050316"
          y="1142.0527"
-         id="tspan71809">open nps   // mode read &amp; write</tspan><tspan
+         id="tspan71809">open npb   // mode write</tspan><tspan
          sodipodi:role="line"
          x="-7.5050316"
          y="1163.6527"
-         id="tspan71811">write nps</tspan><tspan
+         id="tspan71811">write npb</tspan><tspan
          sodipodi:role="line"
          x="-7.5050316"
          y="1185.2528"
@@ -958,11 +958,11 @@
          sodipodi:role="line"
          x="-7.5050316"
          y="1206.8528"
-         id="tspan63855-4">    open NCP</tspan><tspan
+         id="tspan63855-4">    open npc  //mode read</tspan><tspan
          sodipodi:role="line"
          x="-7.5050316"
          y="1228.4528"
-         id="tspan63857-2">read de NPS</tspan></text>
+         id="tspan63857-2">read de npc</tspan></text>
     <image
        width="175.94792"
        height="182.82709"
@@ -1057,7 +1057,7 @@
          sodipodi:role="line"
          x="-7.5050316"
          y="1142.0527"
-         id="tspan51447">open npb   // mode read &amp; write</tspan><tspan
+         id="tspan51447">open npb   // mode read write</tspan><tspan
          sodipodi:role="line"
          x="-7.5050316"
          y="1163.6527"
@@ -1065,15 +1065,15 @@
          sodipodi:role="line"
          x="-7.5050316"
          y="1185.2528"
-         id="tspan57563">    read de NPS</tspan><tspan
+         id="tspan57563">    read de npb</tspan><tspan
          sodipodi:role="line"
          x="-7.5050316"
          y="1206.8528"
-         id="tspan60421">    open NPC    </tspan><tspan
+         id="tspan60421">    open npc  // mode write    </tspan><tspan
          sodipodi:role="line"
          x="-7.5050316"
          y="1228.4528"
-         id="tspan63857">    write NPC</tspan></text>
+         id="tspan63857">    write npc</tspan></text>
     <text
        xml:space="preserve"
        style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:24px;line-height:0.9;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-variant-east-asian:normal;font-feature-settings:normal;font-variation-settings:normal;text-indent:0;text-align:center;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:middle;white-space:normal;shape-padding:0;shape-margin:0;inline-size:0;opacity:1;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.944882;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1"
@@ -1087,7 +1087,7 @@
          y="1075.8953" /></text>
     <path
        style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.49113;stroke-linecap:round;stroke-linejoin:round"
-       d="m 198.09798,350.61131 h 82.54225 v 28.89302 h -82.05459"
+       d="m 212.60023,382.64886 h 82.54225 v 28.89302 h -82.05459"
        id="path77044" />
     <text
        xml:space="preserve"
@@ -1095,19 +1095,66 @@
        x="749.88379"
        y="1079.7483"
        id="text78084"
-       transform="matrix(0.26458333,0,0,0.26458333,37.32401,60.840453)"><tspan
+       transform="matrix(0.26458333,0,0,0.26458333,51.826258,92.877999)"><tspan
          sodipodi:role="line"
-         id="tspan78082"
          x="749.88379"
-         y="1079.7483">npb</tspan></text>
+         y="1079.7483"
+         id="tspan85419">npc</tspan><tspan
+         sodipodi:role="line"
+         x="749.88379"
+         y="1101.3483"
+         id="tspan85423" /></text>
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.49244;stroke-linecap:round;stroke-linejoin:round"
+       d="m 260.84526,321.25957 h -82.69108 v 28.89172 h 82.20253"
+       id="path77044-9" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:24px;line-height:0.9;font-family:sans-serif;font-variant-ligatures:normal;font-variant-position:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-alternates:normal;font-variant-east-asian:normal;font-feature-settings:normal;font-variation-settings:normal;text-indent:0;text-align:center;text-decoration-line:none;text-decoration-style:solid;text-decoration-color:#000000;letter-spacing:normal;word-spacing:normal;text-transform:none;writing-mode:lr-tb;direction:ltr;text-orientation:mixed;dominant-baseline:auto;baseline-shift:baseline;text-anchor:middle;white-space:normal;shape-padding:0;shape-margin:0;inline-size:0;vector-effect:none;fill:#ffffff;fill-opacity:1;stroke:#ffffff;stroke-width:0.944882;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       x="749.88379"
+       y="1079.7483"
+       id="text78084-3"
+       transform="matrix(0.26458333,0,0,0.26458333,17.51603,31.488057)"><tspan
+         sodipodi:role="line"
+         id="tspan78082-9"
+         x="749.88379"
+         y="1079.7483">npb</tspan><tspan
+         sodipodi:role="line"
+         x="749.88379"
+         y="1101.3483"
+         id="tspan84905" /></text>
     <path
        style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
-       d="m 142.87439,353.34473 c 11.86927,-3.77156 19.33354,5.40843 29.3581,10.17961 6.00794,2.85945 13.23756,2.0651 19.71425,2.0651"
-       id="path78747" />
+       d="m 77.657172,373.88791 c 19.410029,0.83235 38.378988,0.8255 57.985218,0.8255 6.41693,0 14.13468,-1.21246 20.27267,0.82481 10.74791,3.56735 14.58143,15.13493 22.8834,21.52105 7.03614,5.41242 27.98559,2.409 36.84843,-0.0114"
+       id="path97940" />
     <path
        style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
-       d="m 188.72242,363.04851 c 10.08773,0.37023 5.74182,1.23743 2.21245,6.53148"
-       id="path78749" />
+       d="m 212.70503,393.1999 c 9.35842,1.9228 7.64034,2.11137 3.97421,9.44366"
+       id="path97942" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
+       d="m 340.81691,356.38403 c -24.58842,3.72805 -42.8062,-13.35527 -65.00355,-19.85264 -6.67176,-1.95289 -13.36453,-1.80534 -20.24539,-1.80534"
+       id="path97950" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
+       d="m 256.54955,330.77405 c -5.69382,4.24395 -6.78024,3.0634 0.10007,6.5037"
+       id="path97952" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
+       d="m 299.47759,394.06151 c 3.80809,0.63392 7.20674,-1.2192 10.67173,-2.74812 8.6647,-3.82323 6.55045,-11.07257 12.68312,-15.16102 3.83905,-2.55934 9.22544,-1.85042 13.66599,-1.85042"
+       id="path102421" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
+       d="m 334.02324,372.05052 4.21127,2.14136 -3.78906,2.19203"
+       id="path102423" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
+       d="m 171.86515,332.94022 c -3.98727,-0.8985 -7.78829,-0.36893 -10.69985,2.83853 -5.1604,5.68487 -5.5592,14.31039 -12.15099,19.03622 -14.06147,10.08107 -47.97976,7.79391 -65.383404,7.79391"
+       id="path103582" />
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#ffffff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round"
+       d="m 85.675884,360.28271 -2.770394,2.56776 2.715319,1.44496"
+       id="path103584" />
   </g>
   <script
      id="mesh_polyfill"
