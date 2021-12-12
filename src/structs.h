@@ -8,15 +8,15 @@
 typedef struct fcli{
     char nome[50];
     pid_t pid_cliente; // maneira de o identificar
-    char sintomas[100];
+    char sintomas[TAM_MAX_MSG];
 }fromCliente, *pfromCliente;
 
 typedef struct tcli{
-	char msg[50];
+	char msg[TAM_MAX_MSG];
 }toCliente, *ptoCliente;
 
 typedef struct med{
-    char nome[100];
+    char nome[50];
     int nif;
     char especificacao[20];
     bool disponivel; // perguntar se pode utilizar

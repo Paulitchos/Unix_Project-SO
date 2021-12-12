@@ -18,15 +18,14 @@
 
 #include <stdbool.h>
 
-/* nome do FIFO do servidor */
-#define SERVER_FIFO "/tmp/dict_fifo"
+// Balcao FIFO's name
+#define BALCAO_FIFO "/tmp/balcao_fifo"
 
-/* nome do FIFO cada cliente. P %d será substituído pelo PID com sprintf */
-#define CLIENT_FIFO "/tmp/resp_%d_fifo"
+// Client FIFO's name, %d will be substituted with sprintf
+#define CLIENT_FIFO "/tmp/cliente_%d_fifo"
 
-/* tamanho máximo de cada palavra */
-#define TAM_MAX 50
-
+// max size of each message
+#define TAM_MAX_MSG 100
 
 #define WAIT_TIME 15
 

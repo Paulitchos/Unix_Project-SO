@@ -12,6 +12,8 @@
 #include <signal.h>
 #include <string.h>
 
+// todo, vale a pena ter um thread diferente para cada cliente?
+
 /*
 Run with:
     gcc selecx.c -o /tmp/selecx && /tmp/selecx
@@ -34,8 +36,8 @@ int main(int arcg, char * argv[]){
     signal(SIGINT, trataCC); // para interroper via ^C
 
     //cria pipes
-    mkfifo("pipe_a",00777); // todo what is 00777
-    mkfifo("pipe_b",00777);
+    mkfifo("pipe_a", S_IRUSR | S_IWUSR); // todo what is 00777, 00 -octal , 7 -> 111 rwe read write execute
+    mkfifo("pipe_b",00777); // man 2 open // primeiro - quem cria, segundo é para o grupo, o terceiro é para others (toda a gente)
 
     //abre os pipes. RDRW vs RD -notar isto
     fd_a = open("pipe_a",O_RDWR | O_NONBLOCK);
@@ -58,7 +60,7 @@ int main(int arcg, char * argv[]){
         //bloqueia ate: sinal, timeout, há dados para ler EOF, exception
         
         nfd = select(           //bloqueia até haver dados ou EOF no read-set
-            max(fd_a,fd_b)+1,   //max valor dos vários fd + 1  // todo what is max for
+            max(fd_a,fd_b)+1,   //max valor dos vários fd + 1  // passar o indice mais elevado mais 1, para o select saber // todo what is max for 
             & read_fds,         //read fd set
             NULL,               //write fd set- (nenhum aqui)
             NULL,               //exeception fd set- (nenhum aqui)
@@ -66,8 +68,8 @@ int main(int arcg, char * argv[]){
             // actualiza tv -> quanto tempo faltava para o timeout
     
         if(nfd == 0) {
-            printf("\n(Estou a espera....)\n"); fflush(stdout);  // todo what is fflush(stdout) for
-            continue;
+            printf("\n(Estou a espera....)\n"); fflush(stdout);  // obrigar o output a ir logo par ao ecrã // todo what is fflush(stdout) for
+            continue; //fflsush(stdin) é mais problematico
         }
 
         if (nfd == -1) {
@@ -126,7 +128,7 @@ void trataTeclado() {
 }
 
 void sayThisAndExit(char * p){
-    perror(p);   //todo perror faz algum log? stderr?
+    perror(p);   //todo perror faz algum log? stderr? // podes usar pra errors mesmo quando já ridirecionaste o stdin para um pipe por exemplo!
     exit(EXIT_FAILURE);
 }
 

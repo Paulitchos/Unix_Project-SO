@@ -31,13 +31,13 @@ void trata_SIGINT(int i) { // CTRL + C
 	fprintf(stderr, "\nServidor de dicionário a terminar "
 									"(interrompido via teclado)\n\n");
 	close(npb);
-	unlink(SERVER_FIFO);
+	unlink(BALCAO_FIFO);
 	exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char **argv,  char *envp[]){
     setbuf(stdout, NULL);
-    // ============== Treat Signals ==============
+    // ============== Treat Signals ============== //
     if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
         perror("\nWARNING: Não foi possível configurar sinal SIGPIPE\n");
     fprintf(stderr, "\nSinal SIGPIPE configurado");
@@ -45,8 +45,30 @@ int main(int argc, char **argv,  char *envp[]){
         perror("\nNão foi possível configurar sinal SIGINT!\n");
         exit(EXIT_FAILURE); }
     fprintf(stderr, "\nSinal SIGINT configurado");
-    // ============== ==============
+    // ============== ============= ============== //
 
+    
+/*
+	bool debugging = false;
+	bool success = false;
+	if (argc==2)
+		success = true;
+	else if (argc > 2)
+		for (int i = 2; i < argc; i++) {
+			if (!(strcmp(argv[i],"--debugging")) || !(strcmp(argv[i],"-D"))){
+				printf("==Debugging mode activated==\n");
+				success = true;
+				debugging = true;
+				break;
+			}
+		}
+	if (!success){
+		printf("Deve introduzir o seu nome como primeiro argumento\n");
+		printf("Opcoes existentes: --debugging ou -D\n");
+		printf("Exemplo ./cliente <nome> --debugging\n");
+		exit(EXIT_SUCCESS);
+	}
+*/
     /*
     // ============== Get environment variables ==============
     char name[100];
@@ -134,15 +156,11 @@ int main(int argc, char **argv,  char *envp[]){
 
 	int	res;
 	int	i;
-	char	c_fifo_fname[50];
-	printf("\nServidor de dicionário");
+	char cFifoName[50];
+	printf("Balcão!\n");
 
-	res = mkfifo(SERVER_FIFO, 0777);
-	if (res == -1)
-	{
-		perror("\nmkfifo do FIFO do servidor deu erro");
-		exit(EXIT_FAILURE);
-	}
+	res = mkfifo(BALCAO_FIFO, 0777);
+	if (res == -1){	perror("\nmkfifo do FIFO do servidor deu erro"); exit(EXIT_FAILURE); }
 	fprintf(stderr, "\nFIFO servidor criado");
 
 	// prepara FIFO do servidor
@@ -150,7 +168,7 @@ int main(int argc, char **argv,  char *envp[]){
 	// bloqueado no open. a execução prossegue e as		
 	// operações read/write (neste caso apenas READ)		
 	// continuam bloqueantes (mais fácil de gerir)			
-	npb = open(SERVER_FIFO, O_RDWR);
+	npb = open(BALCAO_FIFO, O_RDWR);
 	if (npb == -1)
 	{
 		perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)");
@@ -184,10 +202,10 @@ int main(int argc, char **argv,  char *envp[]){
 		fprintf(stderr, "\nResposta = [%s]", tcli.msg);
 
 		/* ---- OBTÉM FILENAME DO FIFO PARA A RESPOSTA ---- */
-		sprintf(c_fifo_fname, CLIENT_FIFO, fcli.pid_cliente);
+		sprintf(cFifoName, CLIENT_FIFO, fcli.pid_cliente);
 
 		/* ---- ABRE O FIFO do cliente p/ write ---- */
-		npc = open(c_fifo_fname, O_WRONLY);
+		npc = open(cFifoName, O_WRONLY);
 		if (npc == -1)
 			perror("\nErro no open - Ninguém quis a resposta");
 		else
@@ -208,6 +226,6 @@ int main(int argc, char **argv,  char *envp[]){
 
 	/* em princípio não chega a este ponto - sai via SIGINT */
 	close(npb);
-	unlink(SERVER_FIFO);
+	unlink(BALCAO_FIFO);
 	return (0);
 }

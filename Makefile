@@ -1,8 +1,8 @@
 balcao:
-	gcc ./src/balcao.c -o ./dist/balcao -lm && ./dist/balcao
+	gcc ./src/balcao.c ./src/utils.c -o ./dist/balcao -lm && ./dist/balcao
 
 cliente:
-	gcc ./src/cliente.c -o ./dist/cliente -lm && ./dist/cliente Paulo
+	gcc ./src/cliente.c ./src/utils.c -o ./dist/cliente -lm && ./dist/cliente Paulo -D
 
 run:
 	./dist/main

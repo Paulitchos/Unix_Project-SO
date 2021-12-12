@@ -1,6 +1,7 @@
 #include "structs.h"
 #include "globals.h"
 
+void debugString(char * str);
 
 int main(int argc, char **argv){
 
@@ -8,77 +9,73 @@ int main(int argc, char **argv){
     toCliente tcli;
     int tam;
 
-    if (argc != 2){                                     //caso tenho mais que um argumento
-        printf("Deve introduzir apenas o seu nome\n");
-        printf("Exemplo ./cliente <nome>\n");
-        exit(EXIT_SUCCESS);
-    }
-     
-    sscanf(argv[1], "%s", &fcli.nome); // vai buscar ao argv[1] o nome do cliente
+	// ======== Checking Arguments ======== //
+	bool debugging = false;
+	bool success = false;
+	if (argc==2)
+		success = true;
+	else if (argc > 2)
+		for (int i = 2; i < argc; i++) {
+			if (!(strcmp(argv[i],"--debugging")) || !(strcmp(argv[i],"-D"))){
+				printf("==Debugging mode activated==\n");
+				success = true;
+				debugging = true;
+				break;
+			}
+		}
+	if (!success){
+		printf("Deve introduzir o seu nome como primeiro argumento\n");
+		printf("Opcoes existentes: --debugging ou -D\n");
+		printf("Exemplo ./cliente <nome> --debugging\n");
+		exit(EXIT_SUCCESS);
+	}
+	// ======== ================== ======== //
 
-    printf("%s\n",fcli.nome);
-
-    fcli.pid_cliente = getpid(); // guarda na struct fromCliente o PID único de casa cliente
-    printf("My PID is: %d\n", fcli.pid_cliente);
-
-    printf("Quais sao os seus sintomas?\n");
-
-    tam = read(STDIN_FILENO,fcli.sintomas,sizeof(fcli.sintomas)); // read from user
-    if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
-    fcli.sintomas[tam] = '\0';
-
-    printf("\n%s\n",fcli.sintomas);
-
-
-    //sprintf(c_fifo_fname, CLIENT_FIFO, fcli.pid_cliente); // atualiza o nome do fifo deste cliente
+	if (debugging) fprintf(stderr, "==My PID is: %d==\n", getpid());
+	printf("Bem vindo %s!\n",argv[1]);
 
     // ===========================
-    int	npb;	/* identificador do FIFO do servidor */
-	int	npc;	/* identificador do FIFO do cliente */
-	//pergunta_t fcli;	/* mensagem do tipo "pergunta_t" */
-	//resposta_t	resp;	/* mensagem do tipo "resposta_t" */
-	char c_fifo_fname[25];	/* nome do FIFO deste cliente */
+    int	npb;	// <named pipe balcao> FIFO's identifier for balcao
+	int	npc;	// <named pipe cliente> FIFO's identifier for cliente
+	char cFifoName[25];	// <client FIFO name> this client FIFO's name
 	int	read_res;
 
-	/* cria o FIFO deste cliente */
-	fcli.pid_cliente = getpid();
-	sprintf(c_fifo_fname, CLIENT_FIFO, fcli.pid_cliente);
-	if (mkfifo(c_fifo_fname, 0777) == -1){
-		perror("\nmkfifo FIFO cliente deu erro");
-		exit(EXIT_FAILURE);
-	}
-	fprintf(stderr, "\nFIFO do cliente criado");
+	strcpy(fcli.nome, argv[1]); // save the client name in the fromCliente struct
+    fcli.pid_cliente = getpid(); // save the unique client PID in struct fromCliente
 
-	/* abre o FIFO do servidor para escrita */
-	npb = open(SERVER_FIFO, O_WRONLY); /* bloqueante */
-	if (npb == -1){
-		fprintf(stderr, "\nO servidor não está a correr\n");
-		unlink(c_fifo_fname);
-		exit(EXIT_FAILURE);
-	}
-    fprintf(stderr, "\nFIFO do servidor aberto WRITE / BLOCKING");
+	// create this client's FIFO
+	sprintf(cFifoName, CLIENT_FIFO, fcli.pid_cliente); // CLIENT_FIFO = "/tmp/resp_%d_fifo"
+	if (mkfifo(cFifoName, 0b111111111) == -1){ //? with 0777 first zero means octal, get converted to 0b(binary) 111 111 111, (0x is hexadecimal), 7 is 111 for rwx (read/write/execute), three sevens for ugo (owner/group/others)
+		perror("\nmkfifo FIFO cliente deu erro"); exit(EXIT_FAILURE); }
+	if (debugging) fprintf(stderr, "==FIFO do cliente criado, cFifoName is: |%s|==\n", cFifoName);
 
-	/* abertura read+write -> evita o comportamento de ficar	*/
-	/* bloqueado no open. a execução prossegue logo mas as		*/
-	/* operações read/write (neste caso APENAS READ)			*/
-	/* continuam bloqueantes (mais fácil)						*/
-	npc = open(c_fifo_fname, O_RDWR);	/* bloqueante */
-	if (npc == -1){
-		perror("\nErro ao abrir o FIFO do cliente");
-		close(npb);
-		unlink(c_fifo_fname);
-		exit(EXIT_FAILURE);
-	}
-	fprintf(stderr, "\nFIFO do cliente aberto para READ (+WRITE) BLOCK");
+	// open balcao's FIFO for writing
+	npb = open(BALCAO_FIFO, O_WRONLY); // bloqueante
+	if (npb == -1){ // if couldn't find balcao's fifo
+		fprintf(stderr, "\nO balcao não está a correr\n"); 
+		unlink(cFifoName); exit(EXIT_FAILURE); }
+    if (debugging) fprintf(stderr, "==FIFO do balcao aberto WRITE / BLOCKING==\n");
 
-	memset(fcli.sintomas, '\0', TAM_MAX);
+	// abertura read+write evita o comportamento de ficar bloqueado no open. a execução prossegue logo mas as operações read/write (neste caso APENAS READ) continuam bloqueantes						
+	npc = open(cFifoName, O_RDWR);	// bloqueante
+	if (npc == -1){ perror("\nErro ao abrir o FIFO do cliente"); close(npb); unlink(cFifoName); exit(EXIT_FAILURE); }
+	if (debugging) fprintf(stderr, "==FIFO do proprio cliente aberto READ(+WRITE) / BLOCKING==\n");
 
+	memset(fcli.sintomas, '\0', TAM_MAX_MSG); // guarantees memory zone to send  is clear
+
+	printf("\nQuais sao os seus sintomas?\n");
 	while (1){
-		/* "fim" para terminar cliente */
-		/* ---- a) OBTÉM fcliUNTA ---- */
-		printf("\nPalavra a traduzir -> ");
+		// read from user
+		//tam = read(STDIN_FILENO,&fcli.sintomas,sizeof(fcli.sintomas));
+		//if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
+		//fcli.sintomas[tam-1] = '\0';
+		//if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
+
 		scanf("%s", fcli.sintomas);
-		if (!strcasecmp(fcli.sintomas, "fim"))
+		//printf("%ld\n", strlen(fcli.sintomas));
+		if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
+
+		if (!strcasecmp(fcli.sintomas, "adeus"))
 			break;
 
 		/* ---- b) ENVIA A fcliUNTA ---- */
@@ -94,7 +91,7 @@ int main(int argc, char **argv){
 
 	close(npc);
 	close(npb);
-	unlink(c_fifo_fname);
+	unlink(cFifoName);
 
 	return (0);
     
