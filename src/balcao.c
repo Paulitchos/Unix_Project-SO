@@ -4,13 +4,13 @@
 #define TAM 50
 
 char* dicionario[7][2] = {
-	{"memory", "memória"},
-	{"computer","computador"},
-	{"close","fechar"},
-	{"open","abrir"},
-	{"read","ler"},
-	{"write","escrever"},
-	{"file","ficheiro"}};
+	{"memory\n", "memória"},
+	{"computer\n","computador"},
+	{"close\n","fechar"},
+	{"open\n","abrir"},
+	{"read\n","ler"},
+	{"write\n","escrever"},
+	{"file\n","ficheiro"}};
 
 int	npb, npc;
 

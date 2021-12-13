@@ -66,29 +66,25 @@ int main(int argc, char **argv){
 	printf("\nQuais sao os seus sintomas?\n");
 	while (1){
 		// read from user
-		printf("ola\n");
 		tam = read(STDIN_FILENO,&fcli.sintomas,sizeof(fcli.sintomas));
-		printf("%d\n",tam);
 		if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
 		fcli.sintomas[tam] = '\0';
 		if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
-
-		//scanf("%s", fcli.sintomas);
-		//printf("%ld\n", strlen(fcli.sintomas));
-		//if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
+		fflush(stdout); // prevents keeping from sending all the information to the screen
 
 		if (!strcasecmp(fcli.sintomas, "adeus"))
 			break;
 
-		/* ---- b) ENVIA A fcliUNTA ---- */
+		// Sends message
 		write(npb, &fcli, sizeof(fcli));
-		/* ---- c) OBTÉM A RESPOSTA ---- */
+
+		// Recieves message
 		read_res = read(npc, &tcli, sizeof(tcli));
 		if (read_res == sizeof(tcli))
-			printf("\nTradução -> %s", tcli.msg);
+			printf("Recebido -> %s\n", tcli.msg);
 		else
-			printf("\nSem resposta ou resposta incompreensível"
-						"[bytes lidos: %d]", read_res);
+			printf("Sem resposta ou resposta incompreensível"
+						"[bytes lidos: %d]\n", read_res);
 	}
 
 	close(npc);
@@ -96,5 +92,4 @@ int main(int argc, char **argv){
 	unlink(cFifoName);
 
 	return (0);
-    
 }
