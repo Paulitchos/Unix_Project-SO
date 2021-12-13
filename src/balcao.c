@@ -36,25 +36,14 @@ void trata_SIGINT(int i) { // CTRL + C
 }
 
 int main(int argc, char **argv,  char *envp[]){
-    setbuf(stdout, NULL);
-    // ============== Treat Signals ============== //
-    if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
-        perror("\nWARNING: Não foi possível configurar sinal SIGPIPE\n");
-    fprintf(stderr, "\nSinal SIGPIPE configurado");
-    if (signal(SIGINT,trata_SIGINT) == SIG_ERR) {
-        perror("\nNão foi possível configurar sinal SIGINT!\n");
-        exit(EXIT_FAILURE); }
-    fprintf(stderr, "\nSinal SIGINT configurado");
-    // ============== ============= ============== //
 
-    
-/*
+	// ======== Checking Arguments ======== //
 	bool debugging = false;
 	bool success = false;
-	if (argc==2)
+	if (argc==1)
 		success = true;
-	else if (argc > 2)
-		for (int i = 2; i < argc; i++) {
+	else
+		for (int i = 1; i < argc; i++) {
 			if (!(strcmp(argv[i],"--debugging")) || !(strcmp(argv[i],"-D"))){
 				printf("==Debugging mode activated==\n");
 				success = true;
@@ -63,12 +52,23 @@ int main(int argc, char **argv,  char *envp[]){
 			}
 		}
 	if (!success){
-		printf("Deve introduzir o seu nome como primeiro argumento\n");
 		printf("Opcoes existentes: --debugging ou -D\n");
-		printf("Exemplo ./cliente <nome> --debugging\n");
+		printf("Exemplo ./balcao --debugging\n");
 		exit(EXIT_SUCCESS);
 	}
-*/
+    // ======== ================== ======== //
+
+    setbuf(stdout, NULL); // if the buffer argument is NULL, the stream is unbuffered
+    // ============== Treat Signals ============== //
+    if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
+        perror("\nNão foi possível configurar sinal SIGPIPE\n");
+    if (debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
+    if (signal(SIGINT,trata_SIGINT) == SIG_ERR) {
+        perror("\nNão foi possível configurar sinal SIGINT!\n");
+        exit(EXIT_FAILURE); }
+    if (debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
+    // ============== ============= ============== //
+
     /*
     // ============== Get environment variables ==============
     char name[100];
@@ -161,7 +161,7 @@ int main(int argc, char **argv,  char *envp[]){
 
 	res = mkfifo(BALCAO_FIFO, 0777);
 	if (res == -1){	perror("\nmkfifo do FIFO do servidor deu erro"); exit(EXIT_FAILURE); }
-	fprintf(stderr, "\nFIFO servidor criado");
+	if (debugging) fprintf(stderr, "==FIFO servidor criado==\n");
 
 	// prepara FIFO do servidor
 	// abertura read+write -> evita o comportamento de ficar
@@ -169,37 +169,32 @@ int main(int argc, char **argv,  char *envp[]){
 	// operações read/write (neste caso apenas READ)		
 	// continuam bloqueantes (mais fácil de gerir)			
 	npb = open(BALCAO_FIFO, O_RDWR);
-	if (npb == -1)
-	{
-		perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)");
+	if (npb == -1){
+		perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n");
 		exit(EXIT_FAILURE);
 	}
-	fprintf(stderr, "\nFIFO aberto para READ (+WRITE) bloqueante");
+	if (debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");
 	
-	/* ciclo principal: read pedido -> write resposta -> repete */
-	while (1) /* sai via SIGINT */
-	{
+	// ciclo principal: read pedido -> write resposta -> repete
+	while (1) {
 		/* ---- OBTEM PERGUNTA ---- */
 		res = read(npb, &fcli, sizeof(fcli));
-		if (res < (int) sizeof(fcli))
-		{
-			fprintf(stderr, "\nRecebida pergunta incompleta "
-											"[bytes lidos: %d]", res);
-			continue; /* não responde a cliente (qual cliente?) */
+		if (res < (int) sizeof(fcli)){
+			fprintf(stderr, "Recebida pergunta incompleta "
+											"[bytes lidos: %d]\n", res);
+			continue; // não responde a cliente (qual cliente?)
 		}
-		fprintf(stderr, "\nRecebido [%s]", fcli.sintomas);
+		fprintf(stderr, "Recebido [%s]\n", fcli.sintomas);
 
-		/* ---- PROCURA TRADUÇÃO ---- */
-		strcpy(tcli.msg, "DESCONHECIDO"); /* caso não encontre */
-		for (i = 0; i < (int)7; i++)
-		{
-			if (!strcasecmp(fcli.sintomas, dicionario[i][0]))
-			{
+		// ---- PROCURA TRADUÇÃO ----
+		strcpy(tcli.msg, "DESCONHECIDO"); // caso não encontre
+		for (i = 0; i < (int)7; i++){
+			if (!strcasecmp(fcli.sintomas, dicionario[i][0])){
 				strcpy(tcli.msg, dicionario[i][1]);
 				break;
 			}
 		}
-		fprintf(stderr, "\nResposta = [%s]", tcli.msg);
+		fprintf(stderr, "Resposta = [%s]\n", tcli.msg);
 
 		/* ---- OBTÉM FILENAME DO FIFO PARA A RESPOSTA ---- */
 		sprintf(cFifoName, CLIENT_FIFO, fcli.pid_cliente);
@@ -207,20 +202,19 @@ int main(int argc, char **argv,  char *envp[]){
 		/* ---- ABRE O FIFO do cliente p/ write ---- */
 		npc = open(cFifoName, O_WRONLY);
 		if (npc == -1)
-			perror("\nErro no open - Ninguém quis a resposta");
-		else
-		{
-			fprintf(stderr, "\nFIFO cliente aberto para WRITE");
+			perror("Erro no open - Ninguém quis a resposta\n");
+		else{
+			fprintf(stderr, "FIFO cliente aberto para WRITE\n");
 
 			/* ---- ENVIA RESPOSTA ---- */
 			res = write(npc, &tcli, sizeof(tcli));
 			if (res == sizeof(tcli))
-				fprintf(stderr, "\nescreveu a resposta");
+				fprintf(stderr, "escreveu a resposta\n");
 			else
-				perror("\nerro a escrever a resposta");
+				perror("erro a escrever a resposta\n");
 
 			close(npc); /* FECHA LOGO O FIFO DO CLIENTE! */
-			fprintf(stderr, "\nFIFO cliente fechado");
+			if (debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
 		}
 	} /* fim do ciclo principal do servidor */
 

@@ -66,14 +66,16 @@ int main(int argc, char **argv){
 	printf("\nQuais sao os seus sintomas?\n");
 	while (1){
 		// read from user
-		//tam = read(STDIN_FILENO,&fcli.sintomas,sizeof(fcli.sintomas));
-		//if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
-		//fcli.sintomas[tam-1] = '\0';
-		//if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
-
-		scanf("%s", fcli.sintomas);
-		//printf("%ld\n", strlen(fcli.sintomas));
+		printf("ola\n");
+		tam = read(STDIN_FILENO,&fcli.sintomas,sizeof(fcli.sintomas));
+		printf("%d\n",tam);
+		if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
+		fcli.sintomas[tam] = '\0';
 		if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
+
+		//scanf("%s", fcli.sintomas);
+		//printf("%ld\n", strlen(fcli.sintomas));
+		//if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
 
 		if (!strcasecmp(fcli.sintomas, "adeus"))
 			break;
