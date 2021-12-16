@@ -163,16 +163,8 @@ int main(int argc, char **argv,  char *envp[]){
 	if (res == -1){	perror("\nmkfifo do FIFO do servidor deu erro"); exit(EXIT_FAILURE); }
 	if (debugging) fprintf(stderr, "==FIFO servidor criado==\n");
 
-	// prepara FIFO do servidor
-	// abertura read+write -> evita o comportamento de ficar
-	// bloqueado no open. a execução prossegue e as		
-	// operações read/write (neste caso apenas READ)		
-	// continuam bloqueantes (mais fácil de gerir)			
-	npb = open(BALCAO_FIFO, O_RDWR);
-	if (npb == -1){
-		perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n");
-		exit(EXIT_FAILURE);
-	}
+	npb = open(BALCAO_FIFO, O_RDWR); // opens in Read/Write mode to prevent getting stuck in open, it's still blocking
+	if (npb == -1){ perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n"); exit(EXIT_FAILURE);	}
 	if (debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");
 	
 	// ciclo principal: read pedido -> write resposta -> repete
@@ -184,7 +176,7 @@ int main(int argc, char **argv,  char *envp[]){
 											"[bytes lidos: %d]\n", res);
 			continue; // não responde a cliente (qual cliente?)
 		}
-		fprintf(stderr, "Recebido [%s]\n", fcli.sintomas);
+		if (debugging) fprintf(stderr, "==Recebido [%s]==\n", fcli.sintomas);
 
 		// ---- PROCURA TRADUÇÃO ----
 		strcpy(tcli.msg, "DESCONHECIDO"); // caso não encontre
@@ -193,23 +185,23 @@ int main(int argc, char **argv,  char *envp[]){
 				strcpy(tcli.msg, dicionario[i][1]);
 				break;
 			}
-		}
-		fprintf(stderr, "Resposta = [%s]\n", tcli.msg);
+		} 
+		
+		if (debugging) fprintf(stderr, "==Resposta = [%s]==\n", tcli.msg);
 
-		/* ---- OBTÉM FILENAME DO FIFO PARA A RESPOSTA ---- */
+		// Get Filename of client's FIFO to send response
 		sprintf(cFifoName, CLIENT_FIFO, fcli.pid_cliente);
 
-		/* ---- ABRE O FIFO do cliente p/ write ---- */
+		// Opens clients FIFO for write
 		npc = open(cFifoName, O_WRONLY);
-		if (npc == -1)
-			perror("Erro no open - Ninguém quis a resposta\n");
+		if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
 		else{
-			fprintf(stderr, "FIFO cliente aberto para WRITE\n");
+			if (debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
 
-			/* ---- ENVIA RESPOSTA ---- */
+			// Send response
 			res = write(npc, &tcli, sizeof(tcli));
-			if (res == sizeof(tcli))
-				fprintf(stderr, "escreveu a resposta\n");
+			if (res == sizeof(tcli) && debugging) // if no error
+				fprintf(stderr, "==escreveu a resposta com sucesso==\n");
 			else
 				perror("erro a escrever a resposta\n");
 
