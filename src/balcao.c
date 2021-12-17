@@ -151,8 +151,10 @@ int main(int argc, char **argv,  char *envp[]){
     */
 
     // ===========================
-    fromCliente	fcli;
-	toCliente tcli;
+    sint_fcli sint_fcli; // <sintomas_fromClient> <sintomas_FromClient>
+	info_fblc info_tcli; // <info_fromBalcao> <info_ToClient>
+	sint_fcli.size = sizeof(sint_fcli);
+	info_tcli.size = sizeof(info_fblc);
 
 	int	res;
 	int	i;
@@ -170,27 +172,27 @@ int main(int argc, char **argv,  char *envp[]){
 	// ciclo principal: read pedido -> write resposta -> repete
 	while (1) {
 		/* ---- OBTEM PERGUNTA ---- */
-		res = read(npb, &fcli, sizeof(fcli));
-		if (res < (int) sizeof(fcli)){
+		res = read(npb, &sint_fcli, sizeof(sint_fcli));
+		if (res < (int) sizeof(sint_fcli)){
 			fprintf(stderr, "Recebida pergunta incompleta "
 											"[bytes lidos: %d]\n", res);
 			continue; // não responde a cliente (qual cliente?)
 		}
-		if (debugging) fprintf(stderr, "==Recebido [%s]==\n", fcli.sintomas);
+		if (debugging) fprintf(stderr, "==Recebido [%s]==\n", sint_fcli.sintomas);
 
 		// ---- PROCURA TRADUÇÃO ----
-		strcpy(tcli.msg, "DESCONHECIDO"); // caso não encontre
+		strcpy(info_tcli.msg, "DESCONHECIDO"); // caso não encontre
 		for (i = 0; i < (int)7; i++){
-			if (!strcasecmp(fcli.sintomas, dicionario[i][0])){
-				strcpy(tcli.msg, dicionario[i][1]);
+			if (!strcasecmp(sint_fcli.sintomas, dicionario[i][0])){
+				strcpy(info_tcli.msg, dicionario[i][1]);
 				break;
 			}
 		} 
 		
-		if (debugging) fprintf(stderr, "==Resposta = [%s]==\n", tcli.msg);
+		if (debugging) fprintf(stderr, "==Resposta = [%s]==\n", info_tcli.msg);
 
 		// Get Filename of client's FIFO to send response
-		sprintf(cFifoName, CLIENT_FIFO, fcli.pid_cliente);
+		sprintf(cFifoName, CLIENT_FIFO, sint_fcli.pid_cliente);
 
 		// Opens clients FIFO for write
 		npc = open(cFifoName, O_WRONLY);
@@ -199,8 +201,8 @@ int main(int argc, char **argv,  char *envp[]){
 			if (debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
 
 			// Send response
-			res = write(npc, &tcli, sizeof(tcli));
-			if (res == sizeof(tcli) && debugging) // if no error
+			res = write(npc, &info_tcli, sizeof(info_tcli));
+			if (res == sizeof(info_tcli) && debugging) // if no error
 				fprintf(stderr, "==escreveu a resposta com sucesso==\n");
 			else
 				perror("erro a escrever a resposta\n");

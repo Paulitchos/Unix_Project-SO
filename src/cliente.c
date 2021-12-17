@@ -5,9 +5,13 @@ void debugString(char * str);
 
 int main(int argc, char **argv){
 
-    fromCliente fcli;
-    toCliente tcli;
-    int tam;
+    sint_fcli sint_toblc; // <sintomas_fromClient> <sintomas_toBalcao>
+    info_fblc info_fblc; // <info_fromBalcao> <info_fromBalcao>
+	sint_toblc.size = sizeof(sint_toblc);
+	info_fblc.size = sizeof(info_fblc);
+	long long pipeMsgSize; // <pipe Message Size>
+    int ret_size; //  <returned size>
+	pinfo_fblc pinfo_fblc;
 
 	// ======== Checking Arguments ======== //
 	bool debugging = false;
@@ -40,11 +44,11 @@ int main(int argc, char **argv){
 	char cFifoName[25];	// <client FIFO name> this client FIFO's name
 	int	read_res;
 
-	strcpy(fcli.nome, argv[1]); // save the client name in the fromCliente struct
-    fcli.pid_cliente = getpid(); // save the unique client PID in struct fromCliente
+	strcpy(sint_toblc.nome, argv[1]); // save the client name in the sint_sint_toblc struct
+    sint_toblc.pid_cliente = getpid(); // save the unique client PID in struct sint_sint_toblc
 
 	// create this client's FIFO
-	sprintf(cFifoName, CLIENT_FIFO, fcli.pid_cliente); // CLIENT_FIFO = "/tmp/resp_%d_fifo"
+	sprintf(cFifoName, CLIENT_FIFO, sint_toblc.pid_cliente); // CLIENT_FIFO = "/tmp/resp_%d_fifo"
 	if (mkfifo(cFifoName, 0b111111111) == -1){ //? with 0777 first zero means octal, get converted to 0b(binary) 111 111 111, (0x is hexadecimal), 7 is 111 for rwx (read/write/execute), three sevens for ugo (owner/group/others)
 		perror("\nmkfifo FIFO cliente deu erro"); exit(EXIT_FAILURE); }
 	if (debugging) fprintf(stderr, "==FIFO do cliente criado, cFifoName is: |%s|==\n", cFifoName);
@@ -61,30 +65,39 @@ int main(int argc, char **argv){
 	if (npc == -1){ perror("\nErro ao abrir o FIFO do cliente"); close(npb); unlink(cFifoName); exit(EXIT_FAILURE); }
 	if (debugging) fprintf(stderr, "==FIFO do proprio cliente aberto READ(+WRITE) / BLOCKING==\n");
 
-	memset(fcli.sintomas, '\0', TAM_MAX_MSG); // guarantees memory zone to send  is clear
+	memset(sint_toblc.sintomas, '\0', TAM_MAX_MSG); // guarantees memory zone to send  is clear
 
 	printf("\nQuais sao os seus sintomas?\n");
 	while (1){
 		// read from user
-		tam = read(STDIN_FILENO,&fcli.sintomas,sizeof(fcli.sintomas));
-		if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
-		fcli.sintomas[tam] = '\0';
-		if (debugging) {fprintf(stderr, "==read: |"); debugString(fcli.sintomas); fprintf(stderr, "|==\n"); }
+		ret_size = read(STDIN_FILENO,&sint_toblc.sintomas,sizeof(sint_toblc.sintomas));
+		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); return 1; }
+		sint_toblc.sintomas[ret_size] = '\0';
+		if (debugging) {fprintf(stderr, "==read: |"); debugString(sint_toblc.sintomas); fprintf(stderr, "|==\n"); }
 		fflush(stdout); // prevents keeping from sending all the information to the screen
 
-		if (!strcasecmp(fcli.sintomas, "adeus"))
+		if (!strcasecmp(sint_toblc.sintomas, "adeus"))
 			break;
 
 		// Sends message
-		write(npb, &fcli, sizeof(fcli));
+		write(npb, &sint_toblc, sizeof(sint_toblc));
+		if (debugging) { fprintf(stderr,"==sent sint_toblc to npb==\n");}
 
 		// Recieves message
-		read_res = read(npc, &tcli, sizeof(tcli));
-		if (read_res == sizeof(tcli))
-			printf("Recebido -> %s\n", tcli.msg);
-		else
-			printf("Sem resposta ou resposta incompreensível"
-						"[bytes lidos: %d]\n", read_res);
+		ret_size = read(npc, &pipeMsgSize, sizeof(pipeMsgSize));
+		if (pipeMsgSize == sizeof(info_fblc)){
+			if(debugging) fprintf(stderr,"==Recieved Msg Type \"info_fblc\"==\n");
+			if(debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(long long) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(long long)));
+
+			read_res = read(npc, &(info_fblc.msg), (int)sizeof(info_fblc)-sizeof(long long));
+			if (read_res == (int)sizeof(info_fblc)-sizeof(long long))
+				printf("Recebido -> %s\n", info_fblc.msg);
+			else
+				printf("Sem resposta ou resposta incompreensível"
+							"[bytes lidos: %d]\n", read_res);
+		} else {
+			printf("Not a info_fblc type msg\n");
+		}
 	}
 
 	close(npc);
