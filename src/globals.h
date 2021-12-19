@@ -29,4 +29,6 @@
 
 #define WAIT_TIME 15
 
+void debugString(char * str);
+
 #endif

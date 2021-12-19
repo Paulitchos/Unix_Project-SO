@@ -1,7 +1,24 @@
 #include "structs.h"
 #include "globals.h"
 
-void debugString(char * str);
+// têm que ser global para ser tratadas no trata_SIGINT
+int	npc; // <named pipe cliente> FIFO's identifier for cliente
+char cFifoName[25];	// <client FIFO name> this client FIFO's name
+
+void trata_SIGPIPE(int s) {
+    static int a; 
+    a++;
+    //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
+    printf("Recebido sinal SIGPIPE %d ",a); // fflush
+}
+
+void trata_SIGINT(int i) { // CTRL + C
+	(void) i;    //todo what?
+	fprintf(stderr, "\nCliente a terminar\n");
+	close(npc);
+	unlink(cFifoName);
+	exit(EXIT_SUCCESS);
+}
 
 int main(int argc, char **argv){
 
@@ -9,7 +26,7 @@ int main(int argc, char **argv){
     info_fblc info_fblc; // <info_fromBalcao> <info_fromBalcao>
 	sint_toblc.size = sizeof(sint_toblc);
 	info_fblc.size = sizeof(info_fblc);
-	int pipeMsgSize; // <pipe Message Size>
+	long long pipeMsgSize; // <pipe Message Size>
     int ret_size; //  <returned size>
 	pinfo_fblc pinfo_fblc;
 
@@ -35,13 +52,21 @@ int main(int argc, char **argv){
 	}
 	// ======== ================== ======== //
 
+    // ============== Treat Signals ============== //
+    if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
+        perror("\nNão foi possível configurar sinal SIGPIPE\n");
+    if (debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
+    if (signal(SIGINT,trata_SIGINT) == SIG_ERR) {
+        perror("\nNão foi possível configurar sinal SIGINT!\n");
+        exit(EXIT_FAILURE); }
+    if (debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
+    // ============== ============= ============== //
+
 	if (debugging) fprintf(stderr, "==My PID is: %d==\n", getpid());
 	printf("Bem vindo %s!\n",argv[1]);
 
     // ===========================
     int	npb;	// <named pipe balcao> FIFO's identifier for balcao
-	int	npc;	// <named pipe cliente> FIFO's identifier for cliente
-	char cFifoName[25];	// <client FIFO name> this client FIFO's name
 	int	read_res;
 
 	strcpy(sint_toblc.nome, argv[1]); // save the client name in the sint_sint_toblc struct
@@ -49,7 +74,7 @@ int main(int argc, char **argv){
 
 	// create this client's FIFO
 	sprintf(cFifoName, CLIENT_FIFO, sint_toblc.pid_cliente); // CLIENT_FIFO = "/tmp/resp_%d_fifo"
-	if (mkfifo(cFifoName, 0b111111111) == -1){ //? with 0777 first zero means octal, get converted to 0b(binary) 111 111 111, (0x is hexadecimal), 7 is 111 for rwx (read/write/execute), three sevens for ugo (owner/group/others)
+	if (mkfifo(cFifoName, 0b111111111) == -1){ // with 0777 first zero means octal, get converted to 0b(binary) 111 111 111, (0x is hexadecimal), 7 is 111 for rwx (read/write/execute), three sevens for ugo (owner/group/others)
 		perror("\nmkfifo FIFO cliente deu erro"); exit(EXIT_FAILURE); }
 	if (debugging) fprintf(stderr, "==FIFO do cliente criado, cFifoName is: |%s|==\n", cFifoName);
 
@@ -87,14 +112,15 @@ int main(int argc, char **argv){
 		ret_size = read(npc, &pipeMsgSize, sizeof(pipeMsgSize));
 		if (pipeMsgSize == sizeof(info_fblc)){
 			if(debugging) fprintf(stderr,"==Recieved Msg Type \"info_fblc\"==\n");
-			if(debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(info_fblc.msg) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(info_fblc.msg)));
+			if(debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(info_fblc.esp) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(info_fblc.esp)));
 
-			if(debugging) printf("==Endreços: &info_fblc: %p | old(&(info_fblc.msg)): %p | (&(info_fblc.size)+1): %p==\n",&info_fblc, &(info_fblc.msg), &(info_fblc.size)+1);
+			if(debugging) printf("==Endreços: &info_fblc: %p | old(&(info_fblc.msg)): %p | (&(info_fblc.size)+1): %p==\n",&info_fblc, &(info_fblc.esp), &(info_fblc.size)+1);
 
 			read_res = read(npc, &(info_fblc.size)+1, (int)sizeof(info_fblc)-sizeof(info_fblc.size));
-			if (read_res == (int)sizeof(info_fblc)-sizeof(info_fblc.size))
-				printf("Recebido -> %s\n", info_fblc.msg);
-			else
+			if (read_res == (int)sizeof(info_fblc)-sizeof(info_fblc.size)) {
+				printf("Especialidade -> %s\n", info_fblc.esp);
+				printf("Prioridade -> %d\n", info_fblc.prio);
+			} else
 				printf("Sem resposta ou resposta incompreensível"
 							"[bytes lidos: %d]\n", read_res);
 		} else {
