@@ -9,7 +9,7 @@ int main(int argc, char **argv){
     info_fblc info_fblc; // <info_fromBalcao> <info_fromBalcao>
 	sint_toblc.size = sizeof(sint_toblc);
 	info_fblc.size = sizeof(info_fblc);
-	long long pipeMsgSize; // <pipe Message Size>
+	int pipeMsgSize; // <pipe Message Size>
     int ret_size; //  <returned size>
 	pinfo_fblc pinfo_fblc;
 
@@ -87,10 +87,12 @@ int main(int argc, char **argv){
 		ret_size = read(npc, &pipeMsgSize, sizeof(pipeMsgSize));
 		if (pipeMsgSize == sizeof(info_fblc)){
 			if(debugging) fprintf(stderr,"==Recieved Msg Type \"info_fblc\"==\n");
-			if(debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(long long) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(long long)));
+			if(debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(info_fblc.msg) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(info_fblc.msg)));
 
-			read_res = read(npc, &(info_fblc.msg), (int)sizeof(info_fblc)-sizeof(long long));
-			if (read_res == (int)sizeof(info_fblc)-sizeof(long long))
+			if(debugging) printf("==Endreços: &info_fblc: %p | old(&(info_fblc.msg)): %p | (&(info_fblc.size)+1): %p==\n",&info_fblc, &(info_fblc.msg), &(info_fblc.size)+1);
+
+			read_res = read(npc, &(info_fblc.size)+1, (int)sizeof(info_fblc)-sizeof(info_fblc.size));
+			if (read_res == (int)sizeof(info_fblc)-sizeof(info_fblc.size))
 				printf("Recebido -> %s\n", info_fblc.msg);
 			else
 				printf("Sem resposta ou resposta incompreensível"

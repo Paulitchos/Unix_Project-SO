@@ -102,7 +102,7 @@ int main(int argc, char **argv,  char *envp[]){
         return 2;
     }
     
-    if (f_res == 0) { //CHILD
+    if (f_res == 0) { //CHILD <Classificador>
         // doesn't need writing side - close
         close(STDIN_FILENO); // stdin is a FILE *, thus you need to use STDIN_FILE_NUMBER instead of stdin
         // Accesses first element of the following table:
@@ -162,7 +162,7 @@ int main(int argc, char **argv,  char *envp[]){
 	printf("Balcão!\n");
 
 	res = mkfifo(BALCAO_FIFO, 0777);
-	if (res == -1){	perror("\nmkfifo do FIFO do servidor deu erro"); exit(EXIT_FAILURE); }
+	if (res == -1){	perror("\nmkfifo do FIFO do balcao deu erro"); exit(EXIT_FAILURE); }
 	if (debugging) fprintf(stderr, "==FIFO servidor criado==\n");
 
 	npb = open(BALCAO_FIFO, O_RDWR); // opens in Read/Write mode to prevent getting stuck in open, it's still blocking

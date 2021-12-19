@@ -6,14 +6,14 @@
 #define WAIT_TIME 15
 
 typedef struct fcli1{
-    long long size;
+    int size;
     char nome[50];
     pid_t pid_cliente; // maneira de o identificar
     char sintomas[TAM_MAX_MSG];
 }sint_fcli, *psint_fcli;
 
 typedef struct fblc1{
-    long long size;
+    int size;
 	char msg[TAM_MAX_MSG];
 }info_fblc, *pinfo_fblc;
 
