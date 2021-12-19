@@ -24,6 +24,9 @@
 // Client FIFO's name, %d will be substituted with sprintf
 #define CLIENT_FIFO "/tmp/cliente_%d_fifo"
 
+// MED FIFO's name, %d will be substituted with sprintf
+#define MED_FIFO "/tmp/med_%d_fifo"
+
 // max size of each message
 #define TAM_MAX_MSG 100
 

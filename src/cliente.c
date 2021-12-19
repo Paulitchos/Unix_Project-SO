@@ -20,6 +20,12 @@ void trata_SIGINT(int i) { // CTRL + C
 	exit(EXIT_SUCCESS);
 }
 
+void exceptionOcurred(){
+    close(npc);
+	unlink(cFifoName);
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char **argv){
 
     sint_fcli sint_toblc; // <sintomas_fromClient> <sintomas_toBalcao>
@@ -109,7 +115,7 @@ int main(int argc, char **argv){
 		if (debugging) { fprintf(stderr,"==sent sint_toblc to npb==\n");}
 
 		// Recieves message
-		ret_size = read(npc, &pipeMsgSize, sizeof(pipeMsgSize));
+		if (read(npc, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { printf("Error Reading, output: %d\n",ret_size); exceptionOcurred(); }
 		if (pipeMsgSize == sizeof(info_fblc)){
 			if(debugging) fprintf(stderr,"==Recieved Msg Type \"info_fblc\"==\n");
 			if(debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(info_fblc.esp) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(info_fblc.esp)));
@@ -121,8 +127,7 @@ int main(int argc, char **argv){
 				printf("Especialidade -> %s\n", info_fblc.esp);
 				printf("Prioridade -> %d\n", info_fblc.prio);
 			} else
-				printf("Sem resposta ou resposta incompreensível"
-							"[bytes lidos: %d]\n", read_res);
+				printf("Resposta incompreensível: %d]\n", read_res);
 		} else {
 			printf("Not a info_fblc type msg\n");
 		}

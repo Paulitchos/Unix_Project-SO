@@ -1,5 +1,6 @@
 #include "structs.h"
 #include "globals.h"
+#include <stdlib.h>
 
 // Run balcao:
 /*
@@ -19,9 +20,15 @@ void trata_SIGPIPE(int s) {
 void trata_SIGINT(int i) { // CTRL + C
 	(void) i;    //todo what?
 	fprintf(stderr, "\nBalcao a terminar\n");
-	close(npb);
+    close(npb);
 	unlink(BALCAO_FIFO);
 	exit(EXIT_SUCCESS);
+}
+
+void exceptionOcurred(){
+    close(npb);
+	unlink(BALCAO_FIFO);
+    exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv,  char *envp[]){
@@ -122,11 +129,14 @@ int main(int argc, char **argv,  char *envp[]){
 
         sint_fcli sint_fcli; // <sintomas_fromClient> <sintomas_FromClient>
         info_fblc info_tcli; // <info_fromBalcao> <info_ToClient>
+        esp_fmed esp_fmed;  // <especialidade_fromMedico>
         sint_fcli.size = sizeof(sint_fcli);
         info_tcli.size = sizeof(info_fblc);
 
         int	res;
         char cFifoName[50];
+        char mFifoName[50];
+        long long pipeMsgSize;
 
         res = mkfifo(BALCAO_FIFO, 0777);
         if (res == -1){	perror("\nmkfifo do FIFO do balcao deu erro"); exit(EXIT_FAILURE); }
@@ -138,51 +148,66 @@ int main(int argc, char **argv,  char *envp[]){
 
         do{
             // Recieve simptoms from cliente
-            res = read(npb, &sint_fcli, sizeof(sint_fcli));
-            if (res < (int) sizeof(sint_fcli)){
-                fprintf(stderr, "Recebida pergunta incompleta "
-                                                "[bytes lidos: %d]\n", res);
-                continue; // não responde a cliente (qual cliente?)
-            }
+            if (read(npb, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { 
+                printf("Error Reading, output\n"); trata_SIGINT(0); }
+            if (pipeMsgSize == sizeof(sint_fcli)){
+			    if(debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
+                res = read(npb, &(sint_fcli.size)+1, (int)sizeof(sint_fcli)-sizeof(sint_fcli.size));
+                if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
+                    // ============== Communicate with Classificador (2) ============== //
+                    if(write(fd[1], sint_fcli.sintomas, strlen(sint_fcli.sintomas)) <= -1){ // write to pipe, write is waiting for amount of characters
+                        printf("Error Writing\n") ; return 1; }
+                    // write uses strlen to not write unecessary data as we know all the data we want to write
+                    
+                    if (debugging) {fprintf(stderr, "==Recebido do cliente & enviado para o classificador: |"); debugString(sint_fcli.sintomas); fprintf(stderr, "|==\n"); }
 
-            // ============== Communicate with Classificador (2) ============== //
-            if(write(fd[1], sint_fcli.sintomas, strlen(sint_fcli.sintomas)) <= -1){ // write to pipe, write is waiting for amount of characters
-                printf("Error Writing\n") ; return 1; }
-            // write uses strlen to not write unecessary data as we know all the data we want to write
-            
-            if (debugging) {fprintf(stderr, "==Recebido do cliente & enviado para o classificador: |"); debugString(sint_fcli.sintomas); fprintf(stderr, "|==\n"); }
+                    tam = read(df[0],msgClassificador,sizeof(msgClassificador)); // read from pipe, tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
+                    if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
+                    // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
+                    msgClassificador[tam] = '\0';
 
-            tam = read(df[0],msgClassificador,sizeof(msgClassificador)); // read from pipe, tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
-            if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
-            // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
-            msgClassificador[tam] = '\0';
+                    if (debugging) {fprintf(stderr, "==Recebido do classificador: |"); debugString(msgClassificador); fprintf(stderr, "|==\n"); }
+                    // ============== ================================== ============== //
 
-            if (debugging) {fprintf(stderr, "==Recebido do classificador: |"); debugString(msgClassificador); fprintf(stderr, "|==\n"); }
-            // ============== ================================== ============== //
+                    // Get Filename of client's FIFO to send response
+                    sprintf(cFifoName, CLIENT_FIFO, sint_fcli.pid_cliente);
 
-            // Get Filename of client's FIFO to send response
-            sprintf(cFifoName, CLIENT_FIFO, sint_fcli.pid_cliente);
+                    // =========== Separar a especialidade e a prioridade ===========
+                    sscanf(msgClassificador,"%[^ ]s%d",info_tcli.esp, &info_tcli.prio);
+                    if (debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
+                    // =========== ====================================== ===========
 
-            // =========== Separar a especialidade e a prioridade ===========
-            sscanf(msgClassificador,"%[^ ]s%d",info_tcli.esp, info_tcli.prio);
-            if (debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
-            // =========== ====================================== ===========
+                    // Opens clients FIFO for write
+                    npc = open(cFifoName, O_WRONLY);
+                    if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
+                    else{
+                        if (debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
 
-            // Opens clients FIFO for write
-            npc = open(cFifoName, O_WRONLY);
-            if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
-            else{
-                if (debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
+                        // Send response
+                        res = write(npc, &info_tcli, sizeof(info_tcli));
+                        if (res == sizeof(info_tcli) && debugging) // if no error
+                            fprintf(stderr, "==escreveu a resposta com sucesso para cliente==\n");
+                        else
+                            perror("erro a escrever a resposta\n");
 
-                // Send response
-                res = write(npc, &info_tcli, sizeof(info_tcli));
-                if (res == sizeof(info_tcli) && debugging) // if no error
-                    fprintf(stderr, "==escreveu a resposta com sucesso para cliente==\n");
-                else
-                    perror("erro a escrever a resposta\n");
+                        close(npc); // FECHA LOGO O FIFO DO CLIENTE!
+                        if (debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+                    }
+                } else {
+                    printf("Resposta incompreensível: %d]\n", res);
+                }
 
-                close(npc); // FECHA LOGO O FIFO DO CLIENTE!
-                if (debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+            } else if (pipeMsgSize == sizeof(esp_fmed)) {
+			    if(debugging) fprintf(stderr,"==Recieved Msg Type \"esp_fmed\"==\n");
+                res = read(npb, &(esp_fmed.size)+1, (int)sizeof(esp_fmed)-sizeof(esp_fmed.size));
+                if (res == (int)sizeof(esp_fmed)-sizeof(esp_fmed.size)){
+                    if (debugging) fprintf(stderr, "==nome medico: %s | especialidade: %s==\n",esp_fmed.nome, esp_fmed.esp);
+                } else {
+                    printf("Resposta incompreensível: %d]\n", res);
+                }
+            } else {
+                fprintf(stderr,"No recognizable message recieved from pipe, aborting\n");
+                exceptionOcurred();
             }
         } while (true);    
 
