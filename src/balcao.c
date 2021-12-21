@@ -136,7 +136,8 @@ int main(int argc, char **argv,  char *envp[]){
         int	res;
         char cFifoName[50];
         char mFifoName[50];
-        long long pipeMsgSize;
+        unsigned short pipeMsgSize;
+        int prioridade;
 
         res = mkfifo(BALCAO_FIFO, 0777);
         if (res == -1){	perror("\nmkfifo do FIFO do balcao deu erro"); exit(EXIT_FAILURE); }
@@ -173,7 +174,11 @@ int main(int argc, char **argv,  char *envp[]){
                     sprintf(cFifoName, CLIENT_FIFO, sint_fcli.pid_cliente);
 
                     // =========== Separar a especialidade e a prioridade ===========
-                    sscanf(msgClassificador,"%[^ ]s%d",info_tcli.esp, &info_tcli.prio);
+                    //sscanf(msgClassificador,"%[^ ]s",info_tcli.esp);
+                    //sscanf(msgClassificador,"%*[^1-3]%d",&info_tcli.prio);
+                    sscanf(msgClassificador,"%s %d",info_tcli.esp,&info_tcli.prio);
+                   
+                    //info_tcli.prio = atoi(&msgClassificador[6]);
                     if (debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
                     // =========== ====================================== ===========
 

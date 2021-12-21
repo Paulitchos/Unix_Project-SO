@@ -26,7 +26,7 @@ int main(int argc, char **argv){
     connectCli_fblc connectCli_fblc; // <info_fromBalcao> <info_fromBalcao>
 	med_toblc.size = sizeof(med_toblc);
 	connectCli_fblc.size = sizeof(connectCli_fblc);
-	long long pipeMsgSize; // <pipe Message Size>
+	unsigned short pipeMsgSize; // <pipe Message Size>
     int ret_size; //  <returned size>
 	pinfo_fblc pinfo_fblc;
 

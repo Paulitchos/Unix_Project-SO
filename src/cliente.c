@@ -32,7 +32,7 @@ int main(int argc, char **argv){
     info_fblc info_fblc; // <info_fromBalcao> <info_fromBalcao>
 	sint_toblc.size = sizeof(sint_toblc);
 	info_fblc.size = sizeof(info_fblc);
-	long long pipeMsgSize; // <pipe Message Size>
+	unsigned short pipeMsgSize; // <pipe Message Size>
     int ret_size; //  <returned size>
 	pinfo_fblc pinfo_fblc;
 
