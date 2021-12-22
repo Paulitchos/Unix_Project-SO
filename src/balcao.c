@@ -8,20 +8,22 @@
 */
 
 // têm que ser global para ser tratadas no trata_SIGINT
-int	npb; // <named pipe balcao>
+static int	npb; // <named pipe balcao>
 
 void trata_SIGPIPE(int s) {
     static int a; 
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
-    printf("Recebido sinal SIGPIPE %d ",a); // fflush
+    printf("Recebido sinal SIGPIPE %d ",a);
 }
 
 void trata_SIGINT(int i) { // CTRL + C
 	(void) i;    //todo what?
 	fprintf(stderr, "\nBalcao a terminar\n");
+	// ===== Close Pipes ===== //
     close(npb);
 	unlink(BALCAO_FIFO);
+
 	exit(EXIT_SUCCESS);
 }
 

@@ -2,7 +2,7 @@
 #include "globals.h"
 #include <stdbool.h>
 
-typedef struct thread_info{ // <from medico>
+typedef struct thread_info{
 	bool debugging;
 	int npb;
 	esp_fmed * pmed_toblc;
@@ -12,6 +12,9 @@ typedef struct thread_info{ // <from medico>
     pthread_t tid; // <ThreadID>
     pthread_mutex_t *pMutVida;
 }thread_info, *pthread_info;
+
+//declared globally to terminate thread when ^C recieved
+static thread_info t_info; // static so it can't be accessed by other source files
 
 //Thread #1
 void * sinalDeVida(void * p){
@@ -27,22 +30,43 @@ void * sinalDeVida(void * p){
     pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
 }
 
-// têm que ser global para ser tratadas no trata_SIGINT
+// têm que ser global para ser tratadas no treat_SIGINT
 int	npm; // <named pipe cliente> FIFO's identifier for cliente
 char mFifoName[25];	// <client FIFO name> this client FIFO's name
 
-void trata_SIGPIPE(int s) {
+void treat_SIGPIPE(int s) {
     static int a; 
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
-    printf("Recebido sinal SIGPIPE %d ",a); // fflush
+    fprintf(stderr, "Recebido sinal SIGPIPE %d ",a);
 }
 
-void trata_SIGINT(int i) { // CTRL + C
+void treat_SIGINT(int i) { // CTRL + C
 	(void) i;    //todo what?
 	fprintf(stderr, "\nMedico a terminar\n");
+	// ===== Close Pipes ===== // //?only need to close them once?
 	close(npm);
 	unlink(mFifoName);
+	// ===== Terminate Threads ===== //
+	if (!pthread_equal(t_info.tid, pthread_self())){ // Necessary
+		fprintf(stderr, "Main thread\n");
+		sleep(1);
+    	(void)pthread_kill(t_info.tid, SIGINT);
+		fprintf(stderr, "sent signal\n");
+		sleep(1);
+	} else {
+		fprintf(stderr, "Not main thread\n");
+		sleep(1);
+		pthread_exit(NULL);
+		fprintf(stderr, "pthread exit executed\n");
+		sleep(1);
+	}
+
+	/*
+	t_info.t_die = true;
+	pthread_join(t_info.tid, NULL);  // Here you recieve the return value of the thread
+	pthread_mutex_destroy(t_info.pMutVida);
+*/
 	exit(EXIT_SUCCESS);
 }
 
@@ -80,10 +104,10 @@ int main(int argc, char **argv){
 	// ======== ================== ======== //
 
     // ============== Treat Signals ============== //
-    if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
+    if (signal(SIGPIPE,treat_SIGPIPE) == SIG_ERR)
         perror("\nNão foi possível configurar sinal SIGPIPE\n");
     if (debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
-    if (signal(SIGINT,trata_SIGINT) == SIG_ERR) {
+    if (signal(SIGINT,treat_SIGINT) == SIG_ERR) {
         perror("\nNão foi possível configurar sinal SIGINT!\n");
         exit(EXIT_FAILURE); }
     if (debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
@@ -119,7 +143,7 @@ int main(int argc, char **argv){
 
 	// ================ Life Signal ================ //
 	pthread_mutex_t MutVida = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
-	thread_info t_info;
+	//thread_info t_info; //declared globally
 	t_info.t_die = false;
 	t_info.npb = npb;
 	t_info.debugging = debugging;

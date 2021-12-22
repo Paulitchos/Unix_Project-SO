@@ -2,21 +2,23 @@
 #include "globals.h"
 
 // têm que ser global para ser tratadas no trata_SIGINT
-int	npc; // <named pipe cliente> FIFO's identifier for cliente
-char cFifoName[25];	// <client FIFO name> this client FIFO's name
+static int	npc; // <named pipe cliente> FIFO's identifier for cliente
+static char cFifoName[25];	// <client FIFO name> this client FIFO's name
 
 void trata_SIGPIPE(int s) {
     static int a; 
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
-    printf("Recebido sinal SIGPIPE %d ",a); // fflush
+    printf("Recebido sinal SIGPIPE %d ",a);
 }
 
 void trata_SIGINT(int i) { // CTRL + C
 	(void) i;    //todo what?
 	fprintf(stderr, "\nCliente a terminar\n");
+	// ===== Close Pipes ===== //
 	close(npc);
 	unlink(cFifoName);
+
 	exit(EXIT_SUCCESS);
 }
 
