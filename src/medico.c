@@ -1,5 +1,31 @@
 #include "structs.h"
 #include "globals.h"
+#include <stdbool.h>
+
+typedef struct thread_info{ // <from medico>
+	bool debugging;
+	int npb;
+	esp_fmed * pmed_toblc;
+	
+    // Thread for life signal
+    bool t_die; // <Thread_Die>
+    pthread_t tid; // <ThreadID>
+    pthread_mutex_t *pMutVida;
+}thread_info, *pthread_info;
+
+//Thread #1
+void * sinalDeVida(void * p){
+	pthread_info sinal_vida = (thread_info *) p;
+	
+    do {
+        sleep(20);
+		pthread_mutex_lock(sinal_vida->pMutVida);
+        write(sinal_vida->npb, sinal_vida->pmed_toblc, sizeof(*sinal_vida->pmed_toblc));
+		if (sinal_vida->debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
+		pthread_mutex_unlock(sinal_vida->pMutVida);
+    }while (!sinal_vida->t_die);
+    pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
+}
 
 // têm que ser global para ser tratadas no trata_SIGINT
 int	npm; // <named pipe cliente> FIFO's identifier for cliente
@@ -20,6 +46,7 @@ void trata_SIGINT(int i) { // CTRL + C
 	exit(EXIT_SUCCESS);
 }
 
+// Thread #0
 int main(int argc, char **argv){
 
     esp_fmed med_toblc; // <sintomas_fromClient> <sintomas_toBalcao>
@@ -65,7 +92,6 @@ int main(int argc, char **argv){
 	if (debugging) fprintf(stderr, "==My PID is: %d==\n", getpid());
 	printf("Bem vindo %s!\n",argv[1]);
 
-    // ===========================
     int	npb;	// <named pipe balcao> FIFO's identifier for balcao
 	int	read_res;
 
@@ -90,6 +116,17 @@ int main(int argc, char **argv){
 	npm = open(mFifoName, O_RDWR);	// bloqueante
 	if (npm == -1){ perror("\nErro ao abrir o FIFO do medico"); close(npb); unlink(mFifoName); exit(EXIT_FAILURE); }
 	if (debugging) fprintf(stderr, "==FIFO do proprio medico aberto READ(+WRITE) / BLOCKING==\n");
+
+	// ================ Life Signal ================ //
+	pthread_mutex_t MutVida = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
+	thread_info t_info;
+	t_info.t_die = false;
+	t_info.npb = npb;
+	t_info.debugging = debugging;
+	t_info.pmed_toblc = &med_toblc;
+	t_info.pMutVida = &MutVida;
+	pthread_create(&t_info.tid, NULL, sinalDeVida, &t_info);
+	// ================ =========== ================ //
 
 	while (1){
 		// Sends message
@@ -117,6 +154,10 @@ int main(int argc, char **argv){
 	close(npm);
 	close(npb);
 	unlink(mFifoName);
+
+	t_info.t_die = true;
+	pthread_join(t_info.tid, NULL);  // Here you recieve the return value of the thread
+	pthread_mutex_destroy(t_info.pMutVida);
 
 	return (0);
 }

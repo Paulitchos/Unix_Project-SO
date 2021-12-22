@@ -109,6 +109,8 @@ void * identificaPares(void * p){
     int i, myCurrent, myFound = 0;
 
     while (1) { // ñ é infinito porque tem condicao de paragem
+        myCurrent = *(myDados->current);
+
         // obtem prox numero
         if (mutexworking) pthread_mutex_lock(myDados->pMutCurr);  //mutexworking
         if (myCurrent >= myDados->last){
@@ -117,8 +119,6 @@ void * identificaPares(void * p){
         }
         ++(*(myDados->current));
         if (mutexworking) pthread_mutex_unlock(myDados->pMutCurr); //mutexworking
-
-        myCurrent = *(myDados->current);
 
         // verifica se é par
         if (myCurrent % 2 == 0){

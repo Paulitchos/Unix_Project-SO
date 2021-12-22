@@ -17,6 +17,7 @@
 #include <ctype.h>
 
 #include <stdbool.h>
+#include <pthread.h>
 
 // Balcao FIFO's name
 #define BALCAO_FIFO "/tmp/balcao_fifo"
