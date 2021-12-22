@@ -1,5 +1,6 @@
 #include "structs.h"
 #include "globals.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 // Run balcao:
@@ -7,7 +8,39 @@
     gcc ./src/balcao.c -o ./dist/balcao && ./dist/balcao
 */
 
+typedef struct listaclientes lista_cli, *plista_cli;  
+
+ struct listaclientes{ // <from balcao>
+    pid_t pid_cliente;
+    char nome[50];
+    char esp[20];
+    int prio;
+    plista_cli prox;
+};
+
+typedef struct listamedicos lista_med, *plista_med;  
+
+ struct listamedicos{ // <from balcao>
+    pid_t pid_medico;
+    char nome[50];
+    char esp[20];
+    bool disponivel; // perguntar se pode utilizar
+    plista_med prox;
+};
+
+plista_cli insert_end(plista_cli p, plista_cli novo_cli);
+void show_info(plista_cli p);
+void free_list(plista_cli p);
+plista_med insert_end_med(plista_med p, plista_med novo_med);
+void show_info_med(plista_med p);
+void free_list_med(plista_med p);
+unsigned int calc_peepAhead(plista_cli cli, plista_cli cli_list);
+bool medExists(pid_t med, plista_med p);
+unsigned int calc_espOnline(plista_cli cli, plista_med p);
+
 // têm que ser global para ser tratadas no trata_SIGINT
+static plista_cli cli_list = NULL;
+static plista_med med_list = NULL;
 static int	npb; // <named pipe balcao>
 
 void trata_SIGPIPE(int s) {
@@ -18,11 +51,14 @@ void trata_SIGPIPE(int s) {
 }
 
 void trata_SIGINT(int i) { // CTRL + C
-	(void) i;    //todo what?
+	(void) i;    //? necessary? Does what
 	fprintf(stderr, "\nBalcao a terminar\n");
 	// ===== Close Pipes ===== //
     close(npb);
 	unlink(BALCAO_FIFO);
+
+    // ===== Free Linked Lists ===== //
+    free_list(cli_list);
 
 	exit(EXIT_SUCCESS);
 }
@@ -130,9 +166,10 @@ int main(int argc, char **argv,  char *envp[]){
         // ============== ================================== ============== //
 
         sint_fcli sint_fcli; // <sintomas_fromClient> <sintomas_FromClient>
+        plista_cli novo_cli; // <Clients_List>
+        plista_med novo_med; // <Medics_List>
         info_fblc info_tcli; // <info_fromBalcao> <info_ToClient>
         esp_fmed esp_fmed;  // <especialidade_fromMedico>
-        sint_fcli.size = sizeof(sint_fcli);
         info_tcli.size = sizeof(info_fblc);
 
         int	res;
@@ -154,9 +191,11 @@ int main(int argc, char **argv,  char *envp[]){
             if (read(npb, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { 
                 printf("Error Reading, output\n"); trata_SIGINT(0); }
             if (pipeMsgSize == sizeof(sint_fcli)){
-			    if(debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
+                if(debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
+                sint_fcli.size = sizeof(sint_fcli);
                 res = read(npb, &(sint_fcli.size)+1, (int)sizeof(sint_fcli)-sizeof(sint_fcli.size));
                 if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
+
                     // ============== Communicate with Classificador (2) ============== //
                     if(write(fd[1], sint_fcli.sintomas, strlen(sint_fcli.sintomas)) <= -1){ // write to pipe, write is waiting for amount of characters
                         printf("Error Writing\n") ; return 1; }
@@ -176,13 +215,29 @@ int main(int argc, char **argv,  char *envp[]){
                     sprintf(cFifoName, CLIENT_FIFO, sint_fcli.pid_cliente);
 
                     // =========== Separar a especialidade e a prioridade ===========
-                    //sscanf(msgClassificador,"%[^ ]s",info_tcli.esp);
-                    //sscanf(msgClassificador,"%*[^1-3]%d",&info_tcli.prio);
                     sscanf(msgClassificador,"%s %d",info_tcli.esp,&info_tcli.prio);
-                   
-                    //info_tcli.prio = atoi(&msgClassificador[6]);
                     if (debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
                     // =========== ====================================== ===========
+
+                    info_tcli.num_peopleAhead = calc_peepAhead(novo_cli, cli_list);
+                    if (debugging) fprintf(stderr, "==people ahead: %d==\n", info_tcli.num_peopleAhead);
+
+                    // =========== Save in Linked List =========== //
+                    novo_cli = malloc(sizeof(*novo_cli));
+                    if (novo_cli==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); exceptionOcurred();}
+                    novo_cli->pid_cliente = sint_fcli.pid_cliente;
+                    strcpy(novo_cli->nome, sint_fcli.nome);
+                    strcpy(novo_cli->esp, info_tcli.esp);
+                    novo_cli->prio = info_tcli.prio;
+                    novo_cli->prox = NULL;
+                    cli_list = insert_end(cli_list, novo_cli);
+                    if (debugging) fprintf(stderr, "==Added New cli to Linked List, showing info:==\n");
+                    if (debugging) show_info(cli_list);
+                    if (debugging) fprintf(stderr, "====\n");
+                    // =========== =================== =========== //
+
+                    info_tcli.num_espOnline = calc_espOnline(novo_cli, med_list);
+                    if (debugging) fprintf(stderr, "==especialistas online: %d==\n", info_tcli.num_espOnline);
 
                     // Opens clients FIFO for write
                     npc = open(cFifoName, O_WRONLY);
@@ -209,6 +264,24 @@ int main(int argc, char **argv,  char *envp[]){
                 res = read(npb, &(esp_fmed.size)+1, (int)sizeof(esp_fmed)-sizeof(esp_fmed.size));
                 if (res == (int)sizeof(esp_fmed)-sizeof(esp_fmed.size)){
                     if (debugging) fprintf(stderr, "==nome medico: %s | especialidade: %s==\n",esp_fmed.nome, esp_fmed.esp);
+                    
+                    if(medExists(esp_fmed.pid_medico,med_list)){
+                        printf("LIFE SIGNAL -> %s %s %d\n", esp_fmed.nome, esp_fmed.esp, esp_fmed.pid_medico);
+                    } else {
+                        // =========== Save in Linked List =========== //
+                        novo_med = malloc(sizeof(*novo_med));
+                        if (novo_med==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); exceptionOcurred();}
+                        novo_med->pid_medico = esp_fmed.pid_medico;
+                        strcpy(novo_med->nome, esp_fmed.nome);
+                        strcpy(novo_med->esp, esp_fmed.esp);
+                        novo_med->disponivel = 1;
+                        novo_med->prox = NULL;
+                        med_list = insert_end_med(med_list, novo_med);
+                        if (debugging) fprintf(stderr, "==Added New med to Linked List, showing info:==\n");
+                        if (debugging) show_info_med(med_list);
+                        if (debugging) fprintf(stderr, "====\n");
+                        // =========== =================== =========== //
+                    }
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
@@ -224,4 +297,120 @@ int main(int argc, char **argv,  char *envp[]){
 	close(npb);
 	unlink(BALCAO_FIFO);
 	return (0);
+}
+
+unsigned int calc_peepAhead(plista_cli cli, plista_cli p){ // only counts peeps for a certain esp
+    unsigned int c = 0;
+    if (p==NULL) 
+        return 0;
+    else if (cli->pid_cliente == p->pid_cliente)
+        return 0;
+            
+    do {
+        if ( strcmp(p->esp,cli->esp) == 0)
+            c++;
+        p = p->prox;
+    } while (p != NULL || cli->pid_cliente != p->pid_cliente);
+    return c;
+}
+
+unsigned int calc_espOnline(plista_cli cli, plista_med p){ // only counts peeps for a certain esp
+    unsigned int c = 0;
+    if (p==NULL || cli==NULL) 
+        return 0;
+            
+    do {
+        if ( strcmp(p->esp,cli->esp) == 0)
+            c++;
+        p = p->prox;
+    } while (p != NULL);
+    return c;
+}
+
+bool medExists(pid_t pid_med, plista_med p){
+    if (p == NULL) return false;
+    do {
+        if ( p->pid_medico == pid_med)
+            return true;
+        p = p->prox;
+    } while (p != NULL);
+    return false;
+}
+
+plista_cli insert_end(plista_cli p, plista_cli novo_cli){
+    plista_cli aux = NULL; 
+    if(novo_cli == NULL) return p;
+    
+    // Inserir no fim da lista  
+    if(p == NULL){  // Inserção à cabeça
+       novo_cli->prox = p;
+       p = novo_cli;
+    }
+    else{
+        aux = p;
+        while(aux->prox != NULL)
+            aux = aux->prox;
+
+        novo_cli->prox = NULL;
+        aux->prox = novo_cli;
+    }
+    
+    return p;   
+}
+
+void free_list(plista_cli p){
+    plista_cli aux;
+    fprintf(stderr, "Freeing PIDs:\n");
+    while(p != NULL){
+        aux = p;
+        p = p->prox;
+        fprintf(stderr, "%d\t", aux->pid_cliente);
+        free(aux);
+    }
+}
+
+plista_med insert_end_med(plista_med p, plista_med novo_med){
+    plista_med aux = NULL; 
+    if(novo_med == NULL) return p;
+    
+    // Inserir no fim da lista  
+    if(p == NULL){  // Inserção à cabeça
+       novo_med->prox = p;
+       p = novo_med;
+    }
+    else{
+        aux = p;
+        while(aux->prox != NULL)
+            aux = aux->prox;
+
+        novo_med->prox = NULL;
+        aux->prox = novo_med;
+    }
+    
+    return p;   
+}
+
+void free_list_med(plista_med p){
+    plista_med aux;
+    fprintf(stderr, "Freeing PIDs:\n");
+    while(p != NULL){
+        aux = p;
+        p = p->prox;
+        fprintf(stderr, "%d\t", aux->pid_medico);
+        free(aux);
+    }
+}
+
+void show_info(plista_cli p){
+    while(p != NULL){
+        fprintf(stderr, "%d\t%s\t%s\t%d\n", p->pid_cliente, p->nome, p->esp, p->prio);
+        p = p->prox;
+    }
+}
+
+void show_info_med(plista_med p){
+    while(p != NULL){
+        fprintf(stderr, "%d\t%s\t%s\t%d\n", p->pid_medico, p->nome, p->esp, p->disponivel);
+        p = p->prox;
+    }
 }

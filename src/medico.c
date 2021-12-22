@@ -46,6 +46,7 @@ void treat_SIGINT(int i) { // CTRL + C
 	if (pthread_equal(t_info.tid, pthread_self())){ // For life signal Thread
 		if (t_info.debugging) fprintf(stderr, "\n==treat_SIGINT Called for Life Signal Thread==\n");
 		if (t_info.debugging) fprintf(stderr, "==[Life Signal Thread] pthread_exit ing==\n");
+		pthread_mutex_destroy(t_info.pMutVida); //? Should this be here
 		pthread_exit(NULL);
 		// [Never Reaches this Line] //
 	} else { // For Main Thread

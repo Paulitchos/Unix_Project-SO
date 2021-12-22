@@ -13,7 +13,7 @@ void trata_SIGPIPE(int s) {
 }
 
 void trata_SIGINT(int i) { // CTRL + C
-	(void) i;    //todo what?
+	(void) i;    //? necessary? Does what
 	fprintf(stderr, "\nCliente a terminar\n");
 	// ===== Close Pipes ===== //
 	close(npc);
