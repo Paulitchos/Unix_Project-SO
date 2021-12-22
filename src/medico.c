@@ -42,31 +42,25 @@ void treat_SIGPIPE(int s) {
 }
 
 void treat_SIGINT(int i) { // CTRL + C
-	(void) i;    //todo what?
-	fprintf(stderr, "\nMedico a terminar\n");
-	// ===== Close Pipes ===== // //?only need to close them once?
-	close(npm);
-	unlink(mFifoName);
-	// ===== Terminate Threads ===== //
-	if (!pthread_equal(t_info.tid, pthread_self())){ // Necessary
-		fprintf(stderr, "Main thread\n");
-		sleep(1);
-    	(void)pthread_kill(t_info.tid, SIGINT);
-		fprintf(stderr, "sent signal\n");
-		sleep(1);
-	} else {
-		fprintf(stderr, "Not main thread\n");
-		sleep(1);
+	(void) i;    //? necessary? Does what
+	if (pthread_equal(t_info.tid, pthread_self())){ // For life signal Thread
+		if (t_info.debugging) fprintf(stderr, "\n==treat_SIGINT Called for Life Signal Thread==\n");
+		if (t_info.debugging) fprintf(stderr, "==[Life Signal Thread] pthread_exit ing==\n");
 		pthread_exit(NULL);
-		fprintf(stderr, "pthread exit executed\n");
-		sleep(1);
-	}
+		// [Never Reaches this Line] //
+	} else { // For Main Thread
+		if (t_info.debugging) fprintf(stderr, "\n==treat_SIGINT Called for Main Thread==\n");
 
-	/*
-	t_info.t_die = true;
-	pthread_join(t_info.tid, NULL);  // Here you recieve the return value of the thread
-	pthread_mutex_destroy(t_info.pMutVida);
-*/
+		// ===== Terminate Threads ===== //
+		if (t_info.debugging) fprintf(stderr, "==[Main Thread] Sending SIGINT to Life Signal Thread==\n");
+    	pthread_kill(t_info.tid, SIGINT);
+		// ===== ================= ===== //
+
+		// ===== Close Pipes ===== // //?only need to close them once?
+		close(npm);
+		unlink(mFifoName);
+		if (t_info.debugging) fprintf(stderr, "==[Main Thread] Closing Pipes==\n");
+	}
 	exit(EXIT_SUCCESS);
 }
 
