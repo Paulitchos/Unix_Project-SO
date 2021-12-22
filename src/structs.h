@@ -39,5 +39,9 @@ typedef struct fblc3{
     pid_t pid_cliente;
 }connectCli_fblc, *pconnectCli_fblc;
 
+typedef struct fmed2{ // <from medico>
+    unsigned short size;
+    pid_t pid_medico;
+}imDead_fmed, *pimDead_fmed;
 
 #endif

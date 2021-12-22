@@ -1,6 +1,7 @@
 #include "structs.h"
 #include "globals.h"
 #include <stdbool.h>
+#include <unistd.h>
 
 typedef struct thread_info{
 	bool debugging;
@@ -33,6 +34,7 @@ void * sinalDeVida(void * p){
 // têm que ser global para ser tratadas no treat_SIGINT
 int	npm; // <named pipe cliente> FIFO's identifier for cliente
 char mFifoName[25];	// <client FIFO name> this client FIFO's name
+int	npb; // <named pipe balcao> FIFO's identifier for balcao
 
 void treat_SIGPIPE(int s) {
     static int a; 
@@ -56,6 +58,14 @@ void treat_SIGINT(int i) { // CTRL + C
 		if (t_info.debugging) fprintf(stderr, "==[Main Thread] Sending SIGINT to Life Signal Thread==\n");
     	pthread_kill(t_info.tid, SIGINT);
 		// ===== ================= ===== //
+
+		// ==== Tell Balcao I'm dead ==== //
+		imDead_fmed imDead_tblc;
+		imDead_tblc.size=sizeof(imDead_tblc);
+		imDead_tblc.pid_medico=getpid();
+		write(npb, &imDead_tblc, sizeof(imDead_tblc));
+		if (t_info.debugging) { fprintf(stderr,"==sent imDead_tblc to npb==\n");}
+		// ==== ==================== ==== //
 
 		// ===== Close Pipes ===== // //?only need to close them once?
 		close(npm);
@@ -111,7 +121,7 @@ int main(int argc, char **argv){
 	if (debugging) fprintf(stderr, "==My PID is: %d==\n", getpid());
 	printf("Bem vindo %s!\n",argv[1]);
 
-    int	npb;	// <named pipe balcao> FIFO's identifier for balcao
+    //int	npb;	// declared globally // <named pipe balcao> FIFO's identifier for balcao
 	int	read_res;
 
 	strcpy(med_toblc.nome, argv[1]); // save the medic name in the med_toblc struct

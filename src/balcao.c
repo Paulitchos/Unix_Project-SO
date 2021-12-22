@@ -37,6 +37,7 @@ void free_list_med(plista_med p);
 unsigned int calc_peepAhead(plista_cli cli, plista_cli cli_list);
 bool medExists(pid_t med, plista_med p);
 unsigned int calc_espOnline(plista_cli cli, plista_med p);
+plista_med cleanDeadMed(plista_med p, pid_t med_pid);
 
 // têm que ser global para ser tratadas no trata_SIGINT
 static plista_cli cli_list = NULL;
@@ -285,6 +286,18 @@ int main(int argc, char **argv,  char *envp[]){
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
+            } else if (pipeMsgSize == sizeof(imDead_fmed)) {
+                if(debugging) fprintf(stderr,"==Recieved Msg Type \"imDead_fmed\"==\n");
+                imDead_fmed deadMedBodyFound;
+                res = read(npb, &(deadMedBodyFound.size)+1, sizeof(deadMedBodyFound)-sizeof(deadMedBodyFound.size));
+                if (res == sizeof(deadMedBodyFound)-sizeof(deadMedBodyFound.size)){
+                    med_list = cleanDeadMed(med_list, deadMedBodyFound.pid_medico);
+                    if (debugging) fprintf(stderr,"== Cleaned Dead Med of PID %d, showing List:==\n",deadMedBodyFound.pid_medico);
+                    if (debugging) show_info_med(med_list);
+                    if (debugging) fprintf(stderr, "====\n");
+                } else {
+                    printf("Resposta incompreensível: %d]\n", res);
+                }
             } else {
                 fprintf(stderr,"No recognizable message recieved from pipe, aborting\n");
                 exceptionOcurred();
@@ -413,4 +426,30 @@ void show_info_med(plista_med p){
         fprintf(stderr, "%d\t%s\t%s\t%d\n", p->pid_medico, p->nome, p->esp, p->disponivel);
         p = p->prox;
     }
+}
+
+plista_med cleanDeadMed(plista_med p, pid_t med_pid){
+    plista_med prev, curr; // <previous> <current>
+    
+    prev = NULL;
+    curr = p;
+    
+    while(curr!=NULL && curr->pid_medico!=med_pid){
+        prev = curr;
+        curr = curr->prox;
+    }
+
+    if(curr == NULL){       // Livro nao existe
+        fprintf(stderr, "Medico Não encontrado\n");
+        return p;
+    }
+    
+    if(prev == NULL)     // 1º nó da lista
+        p = p->prox;
+    else                            // outro nó
+        prev->prox = curr->prox;
+    
+    free(curr);
+
+    return p;
 }
