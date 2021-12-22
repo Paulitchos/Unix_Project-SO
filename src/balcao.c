@@ -60,6 +60,7 @@ void trata_SIGINT(int i) { // CTRL + C
 
     // ===== Free Linked Lists ===== //
     free_list(cli_list);
+    free_list_med(med_list);
 
 	exit(EXIT_SUCCESS);
 }
@@ -373,13 +374,26 @@ plista_cli insert_end(plista_cli p, plista_cli novo_cli){
 
 void free_list(plista_cli p){
     plista_cli aux;
-    fprintf(stderr, "Freeing PIDs:\n");
+    fprintf(stderr, "Freeing cli list, PIDs:\n");
     while(p != NULL){
         aux = p;
         p = p->prox;
         fprintf(stderr, "%d\t", aux->pid_cliente);
         free(aux);
     }
+    putchar('\n');
+}
+
+void free_list_med(plista_med p){
+    plista_med aux;
+    fprintf(stderr, "Freeing med list, PIDs:\n");
+    while(p != NULL){
+        aux = p;
+        p = p->prox;
+        fprintf(stderr, "%d\t", aux->pid_medico);
+        free(aux);
+    }
+    putchar('\n');
 }
 
 plista_med insert_end_med(plista_med p, plista_med novo_med){
@@ -401,17 +415,6 @@ plista_med insert_end_med(plista_med p, plista_med novo_med){
     }
     
     return p;   
-}
-
-void free_list_med(plista_med p){
-    plista_med aux;
-    fprintf(stderr, "Freeing PIDs:\n");
-    while(p != NULL){
-        aux = p;
-        p = p->prox;
-        fprintf(stderr, "%d\t", aux->pid_medico);
-        free(aux);
-    }
 }
 
 void show_info(plista_cli p){
