@@ -2,6 +2,7 @@
 #include "globals.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 // Run balcao:
 /*
@@ -37,12 +38,79 @@ void free_list_med(plista_med p);
 unsigned int calc_peepAhead(plista_cli cli, plista_cli cli_list);
 bool medExists(pid_t med, plista_med p);
 unsigned int calc_espOnline(plista_cli cli, plista_med p);
-plista_med cleanDeadMed(plista_med p, pid_t med_pid);
+plista_med cleanDeadMed(plista_med p, pid_t pid);
+plista_cli cleanDeadCli(plista_cli p, pid_t pid);
+void terminate();
+void tellClisToDie(plista_cli p);
+void tellMedsToDie(plista_med p);
 
-// têm que ser global para ser tratadas no trata_SIGINT
-static plista_cli cli_list = NULL;
-static plista_med med_list = NULL;
-static int	npb; // <named pipe balcao>
+
+typedef struct thread_global_info{
+	bool debugging;
+    plista_cli cli_list;
+	plista_med med_list;
+    int npb; // <named pipe balcao>
+	
+    // Thread for user input
+    bool t_die; // <Thread_Die>
+    pthread_t tid; // <ThreadID>
+    pthread_mutex_t *pMutAll;
+}global_info, *pglobal_info;
+
+// declared globally to terminate thread when ^C recieved
+// static so it can't be accessed by other source files
+static global_info g_info; // <Global_Info>
+
+void * adminCommands(void * p){
+	pglobal_info thread_data = (global_info *) p;
+    freq_tmed freq_tmed;
+    freq_tmed.size = sizeof(freq_tmed);
+    int ret_size,npm,res;
+    pid_t pid_cli,pid_med;
+    char usr_in[TAM_MAX_MSG],mFifoName[50]; // <User_Input>
+    if (thread_data->debugging) { fprintf(stderr,"==User input Thread running==\n");}
+    do {
+        ret_size = read(STDIN_FILENO,&usr_in,sizeof(usr_in));
+		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
+		usr_in[ret_size] = '\0';
+        pthread_mutex_lock(thread_data->pMutAll);
+		if (thread_data->debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
+
+        if(!strcasecmp(usr_in, "UTENTES\n")){
+            if (thread_data->cli_list == NULL) {fprintf(stdout, "Não há utentes para mostrar\n");}
+            show_info(thread_data->cli_list);
+        } else if(!strcasecmp(usr_in, "ESPECIALISTAS\n")){
+            if (thread_data->med_list == NULL) {fprintf(stdout, "Não há especialistas para mostrar\n");}
+            show_info_med(thread_data->med_list);
+        } else if(sscanf(usr_in,"DELUT %d\n",&pid_cli) == 1 ){
+            g_info.cli_list = cleanDeadCli(thread_data->cli_list, pid_cli);
+        }  else if(sscanf(usr_in,"DELESP %d\n",&pid_med) == 1 ){
+            g_info.med_list = cleanDeadMed(thread_data->med_list, pid_med);
+        }else if(sscanf(usr_in,"FREQ %hd\n",&freq_tmed.freq) == 1 ){
+            // Opens clients FIFO for write
+                    npm = open(mFifoName, O_WRONLY);
+                    if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+                    else{
+                        if (thread_data->debugging) fprintf(stderr, "==FIFO medico aberto para WRITE==\n");
+
+                        // Send response
+                        res = write(npm, &freq_tmed, sizeof(freq_tmed));
+                        if (res == sizeof(freq_tmed) && thread_data->debugging) // if no error
+                            fprintf(stderr, "==escreveu a resposta com sucesso para medico==\n");
+                        else
+                            perror("erro a escrever a resposta\n");
+
+                        close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+                        if (thread_data->debugging) fprintf(stderr, "==FIFO medico fechado==\n");
+                    }
+        }else {
+            fprintf(stdout, "Command not recognized\n");
+        }
+
+		pthread_mutex_unlock(thread_data->pMutAll);
+    }while (!thread_data->t_die);
+    pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
+}
 
 void trata_SIGPIPE(int s) {
     static int a; 
@@ -52,23 +120,41 @@ void trata_SIGPIPE(int s) {
 }
 
 void trata_SIGINT(int i) { // CTRL + C
-	(void) i;    //? necessary? Does what
-	fprintf(stderr, "\nBalcao a terminar\n");
-	// ===== Close Pipes ===== //
-    close(npb);
-	unlink(BALCAO_FIFO);
-
-    // ===== Free Linked Lists ===== //
-    free_list(cli_list);
-    free_list_med(med_list);
-
-	exit(EXIT_SUCCESS);
+    if (g_info.debugging) fprintf(stderr, "==treat_SIGINT Called==\n");
+    terminate();
 }
 
-void exceptionOcurred(){
-    close(npb);
-	unlink(BALCAO_FIFO);
-    exit(EXIT_FAILURE);
+void terminate(){
+    if (pthread_equal(g_info.tid, pthread_self())){ // For User Input Thread
+		if (g_info.debugging) fprintf(stderr, "==terminate Called for User Input Thread==\n");
+		if (g_info.debugging) fprintf(stderr, "==[User Input Thread] pthread_exit ing==\n");
+		pthread_mutex_destroy(g_info.pMutAll); //? Should this be here
+		pthread_exit(NULL);
+		// [Never Reaches this Line] //
+	} else { // For Main Thread
+		if (g_info.debugging) fprintf(stderr, "==terminate Called for Main Thread==\n");
+
+		// ===== Terminate Threads ===== //
+		if (g_info.debugging) fprintf(stderr, "==[Main Thread] Sending SIGINT to User Input Thread==\n");
+    	pthread_kill(g_info.tid, SIGINT);
+		// ===== ================= ===== //
+
+		// ==== Tell Everyone to die ==== //
+        tellClisToDie(g_info.cli_list);
+        tellMedsToDie(g_info.med_list);
+		// ==== ==================== ==== //
+
+		// ===== Close Pipes ===== // //?only need to close them once?
+		close(g_info.npb);
+		unlink(BALCAO_FIFO);
+        if (g_info.debugging) fprintf(stderr, "==[Main Thread] Closing Pipes==\n");
+
+        // ==== free memory ==== //
+        free_list(g_info.cli_list);
+        free_list_med(g_info.med_list);
+		if (g_info.debugging) fprintf(stderr, "==[Main Thread] freeing memory==\n");
+	}
+	exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char **argv,  char *envp[]){
@@ -105,6 +191,16 @@ int main(int argc, char **argv,  char *envp[]){
     if (debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
     // ============== ============= ============== //
 
+    if (debugging) { // get current working directory
+        char cwd[500];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            fprintf(stderr, "==Current working dir: %s==\n", cwd);
+        } else {
+            perror("getcwd() error");
+            return 1;
+        }
+    }
+    
     // ============== Get environment variables ==============
     char name[100];
     int maxclientes;
@@ -127,6 +223,7 @@ int main(int argc, char **argv,  char *envp[]){
     printf("MAXMEDICOS:%d\n",maxmedicos);
 
     int npc; // <named pipe cliente>
+    
 
     int f_res;
     int fd[2]; // file descriptor | input, output
@@ -155,7 +252,7 @@ int main(int argc, char **argv,  char *envp[]){
         dup(df[1]);
         close(df[0]);
         close(df[1]);
-        
+
         execlp("./classificador", "classificador", NULL); // executes calssificador
         perror("erro exec prog2: ");
         return 3;
@@ -176,7 +273,6 @@ int main(int argc, char **argv,  char *envp[]){
 
         int	res;
         char cFifoName[50];
-        char mFifoName[50];
         unsigned short pipeMsgSize;
         int prioridade;
 
@@ -184,18 +280,29 @@ int main(int argc, char **argv,  char *envp[]){
         if (res == -1){	perror("\nmkfifo do FIFO do balcao deu erro"); exit(EXIT_FAILURE); }
         if (debugging) fprintf(stderr, "==FIFO servidor criado==\n");
 
-        npb = open(BALCAO_FIFO, O_RDWR); // opens in Read/Write mode to prevent getting stuck in open, it's still blocking
-        if (npb == -1){ perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n"); exit(EXIT_FAILURE);	}
+        g_info.npb = open(BALCAO_FIFO, O_RDWR); // opens in Read/Write mode to prevent getting stuck in open, it's still blocking
+        if (g_info.npb == -1){ perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n"); exit(EXIT_FAILURE);	}
         if (debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");        
+        
+        // ================ User Input ================ //
+        pthread_mutex_t MutAll = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
+        //pthread_mutex_t MutCli = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
+        //pthread_mutex_t MutMed = PTHREAD_MUTEX_INITIALIZER;
+        //global_info g_info; //declared globally
+        g_info.debugging = debugging;
+        g_info.t_die = false;
+        g_info.pMutAll = &MutAll;
+        pthread_create(&g_info.tid, NULL, adminCommands, &g_info);
+        // ================ ========== ================ //
 
         do{
             // Recieve simptoms from cliente
-            if (read(npb, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { 
+            if (read(g_info.npb, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { 
                 printf("Error Reading, output\n"); trata_SIGINT(0); }
             if (pipeMsgSize == sizeof(sint_fcli)){
                 if(debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
                 sint_fcli.size = sizeof(sint_fcli);
-                res = read(npb, &(sint_fcli.size)+1, (int)sizeof(sint_fcli)-sizeof(sint_fcli.size));
+                res = read(g_info.npb, &(sint_fcli.size)+1, (int)sizeof(sint_fcli)-sizeof(sint_fcli.size));
                 if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
 
                     // ============== Communicate with Classificador (2) ============== //
@@ -221,24 +328,24 @@ int main(int argc, char **argv,  char *envp[]){
                     if (debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
                     // =========== ====================================== ===========
 
-                    info_tcli.num_peopleAhead = calc_peepAhead(novo_cli, cli_list);
-                    if (debugging) fprintf(stderr, "==people ahead: %d==\n", info_tcli.num_peopleAhead);
-
                     // =========== Save in Linked List =========== //
                     novo_cli = malloc(sizeof(*novo_cli));
-                    if (novo_cli==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); exceptionOcurred();}
+                    if (novo_cli==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); terminate();}
                     novo_cli->pid_cliente = sint_fcli.pid_cliente;
                     strcpy(novo_cli->nome, sint_fcli.nome);
                     strcpy(novo_cli->esp, info_tcli.esp);
                     novo_cli->prio = info_tcli.prio;
                     novo_cli->prox = NULL;
-                    cli_list = insert_end(cli_list, novo_cli);
+                    g_info.cli_list = insert_end(g_info.cli_list, novo_cli);
                     if (debugging) fprintf(stderr, "==Added New cli to Linked List, showing info:==\n");
-                    if (debugging) show_info(cli_list);
+                    if (debugging) show_info(g_info.cli_list);
                     if (debugging) fprintf(stderr, "====\n");
                     // =========== =================== =========== //
 
-                    info_tcli.num_espOnline = calc_espOnline(novo_cli, med_list);
+                    info_tcli.num_peopleAhead = calc_peepAhead(novo_cli, g_info.cli_list);
+                    if (debugging) fprintf(stderr, "==people ahead: %d==\n", info_tcli.num_peopleAhead);
+
+                    info_tcli.num_espOnline = calc_espOnline(novo_cli, g_info.med_list);
                     if (debugging) fprintf(stderr, "==especialistas online: %d==\n", info_tcli.num_espOnline);
 
                     // Opens clients FIFO for write
@@ -263,52 +370,55 @@ int main(int argc, char **argv,  char *envp[]){
 
             } else if (pipeMsgSize == sizeof(esp_fmed)) {
 			    if(debugging) fprintf(stderr,"==Recieved Msg Type \"esp_fmed\"==\n");
-                res = read(npb, &(esp_fmed.size)+1, (int)sizeof(esp_fmed)-sizeof(esp_fmed.size));
+                res = read(g_info.npb, &(esp_fmed.size)+1, (int)sizeof(esp_fmed)-sizeof(esp_fmed.size));
                 if (res == (int)sizeof(esp_fmed)-sizeof(esp_fmed.size)){
                     if (debugging) fprintf(stderr, "==nome medico: %s | especialidade: %s==\n",esp_fmed.nome, esp_fmed.esp);
                     
-                    if(medExists(esp_fmed.pid_medico,med_list)){
+                    if(medExists(esp_fmed.pid_medico,g_info.med_list)){
                         printf("LIFE SIGNAL -> %s %s %d\n", esp_fmed.nome, esp_fmed.esp, esp_fmed.pid_medico);
                     } else {
                         // =========== Save in Linked List =========== //
                         novo_med = malloc(sizeof(*novo_med));
-                        if (novo_med==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); exceptionOcurred();}
+                        if (novo_med==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); terminate(); }
                         novo_med->pid_medico = esp_fmed.pid_medico;
                         strcpy(novo_med->nome, esp_fmed.nome);
                         strcpy(novo_med->esp, esp_fmed.esp);
                         novo_med->disponivel = 1;
                         novo_med->prox = NULL;
-                        med_list = insert_end_med(med_list, novo_med);
+                        g_info.med_list = insert_end_med(g_info.med_list, novo_med);
                         if (debugging) fprintf(stderr, "==Added New med to Linked List, showing info:==\n");
-                        if (debugging) show_info_med(med_list);
+                        if (debugging) show_info_med(g_info.med_list);
                         if (debugging) fprintf(stderr, "====\n");
                         // =========== =================== =========== //
                     }
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
-            } else if (pipeMsgSize == sizeof(imDead_fmed)) {
-                if(debugging) fprintf(stderr,"==Recieved Msg Type \"imDead_fmed\"==\n");
-                imDead_fmed deadMedBodyFound;
-                res = read(npb, &(deadMedBodyFound.size)+1, sizeof(deadMedBodyFound)-sizeof(deadMedBodyFound.size));
-                if (res == sizeof(deadMedBodyFound)-sizeof(deadMedBodyFound.size)){
-                    med_list = cleanDeadMed(med_list, deadMedBodyFound.pid_medico);
-                    if (debugging) fprintf(stderr,"== Cleaned Dead Med of PID %d, showing List:==\n",deadMedBodyFound.pid_medico);
-                    if (debugging) show_info_med(med_list);
+            } else if (pipeMsgSize == sizeof(imDead)) {
+                if(debugging) fprintf(stderr,"==Recieved Msg Type \"imDead\"==\n");
+                imDead deadBodyFound;
+                res = read(g_info.npb, &(deadBodyFound.size)+1, sizeof(deadBodyFound)-sizeof(deadBodyFound.size));
+                if (res == sizeof(deadBodyFound)-sizeof(deadBodyFound.size)){
+                    g_info.med_list = cleanDeadMed(g_info.med_list, deadBodyFound.pid);
+                    g_info.cli_list = cleanDeadCli(g_info.cli_list, deadBodyFound.pid);
+                    if (debugging) fprintf(stderr,"== Cleaned Dead Body of PID %d, showing  med List:==\n",deadBodyFound.pid);
+                    if (debugging) show_info_med(g_info.med_list);
+                    if (debugging) fprintf(stderr, "==Showing Cli List:==\n");
+                    if (debugging) show_info(g_info.cli_list);
                     if (debugging) fprintf(stderr, "====\n");
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
             } else {
                 fprintf(stderr,"No recognizable message recieved from pipe, aborting\n");
-                exceptionOcurred();
+                terminate();
             }
         } while (true);    
 
         return 4;
     }
 	// shouldn't reach this point
-	close(npb);
+	close(g_info.npb);
 	unlink(BALCAO_FIFO);
 	return (0);
 }
@@ -324,7 +434,9 @@ unsigned int calc_peepAhead(plista_cli cli, plista_cli p){ // only counts peeps 
         if ( strcmp(p->esp,cli->esp) == 0)
             c++;
         p = p->prox;
-    } while (p != NULL || cli->pid_cliente != p->pid_cliente);
+        if (p == NULL)
+            break;
+    } while (cli->pid_cliente != p->pid_cliente);
     return c;
 }
 
@@ -350,6 +462,7 @@ bool medExists(pid_t pid_med, plista_med p){
     } while (p != NULL);
     return false;
 }
+
 
 plista_cli insert_end(plista_cli p, plista_cli novo_cli){
     plista_cli aux = NULL; 
@@ -453,6 +566,92 @@ plista_med cleanDeadMed(plista_med p, pid_t med_pid){
         prev->prox = curr->prox;
     
     free(curr);
+    fprintf(stderr, "Medico expulso\n");
 
     return p;
+}
+
+plista_cli cleanDeadCli(plista_cli p, pid_t pid){
+    plista_med prev, curr; // <previous> <current>
+    
+    prev = NULL;
+    curr = p;
+    
+    while(curr!=NULL && curr->pid_medico!=pid){
+        prev = curr;
+        curr = curr->prox;
+    }
+
+    if(curr == NULL){       // Livro nao existe
+        fprintf(stderr, "Cliente Não encontrado\n");
+        return p;
+    }
+    
+    if(prev == NULL)     // 1º nó da lista
+        p = p->prox;
+    else                            // outro nó
+        prev->prox = curr->prox;
+    
+    free(curr);
+    fprintf(stderr, "Cliente Expulso\n");
+
+    return p;
+}
+
+void tellClisToDie(plista_cli p){
+    if (p == NULL) return;
+    suicide Die_Clis;
+    Die_Clis.size=sizeof(Die_Clis);
+    char cFifoName[50];
+    int res;
+    int npc;
+    do {
+        sprintf(cFifoName, CLIENT_FIFO, p->pid_cliente);
+        if (g_info.debugging) fprintf(stderr, "==Nome do cliente :%s==\n",cFifoName);
+
+        // Opens clients FIFO for write
+        npc = open(cFifoName, O_WRONLY);
+        if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
+        else{
+            if (g_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
+            // Send response
+            res = write(npc, &Die_Clis, sizeof(Die_Clis));
+            if (res == sizeof(Die_Clis) && g_info.debugging) // if no error
+                fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+            else
+                perror("erro a escrever a resposta\n");
+            close(npc); // FECHA LOGO O FIFO DO CLIENTE!
+            if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+        }
+        p = p->prox;
+    } while (p != NULL);   
+}
+
+void tellMedsToDie(plista_med p){
+    if (p == NULL) return;
+    suicide Die_Meds;
+    Die_Meds.size=sizeof(Die_Meds);
+    char cFifoName[50];
+    int res;
+    int npm;
+    do {
+        sprintf(cFifoName, MED_FIFO, p->pid_medico);
+        if (g_info.debugging) fprintf(stderr, "==Nome do cliente :%s==\n",cFifoName);
+
+        // Opens clients FIFO for write
+        npm = open(cFifoName, O_WRONLY);
+        if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+        else{
+            if (g_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
+            // Send response
+            res = write(npm, &Die_Meds, sizeof(Die_Meds));
+            if (res == sizeof(Die_Meds) && g_info.debugging) // if no error
+                fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+            else
+                perror("erro a escrever a resposta\n");
+            close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+            if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+        }
+        p = p->prox;
+    } while (p != NULL);   
 }

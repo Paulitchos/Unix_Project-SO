@@ -4,6 +4,7 @@
 // têm que ser global para ser tratadas no trata_SIGINT
 static int	npc; // <named pipe cliente> FIFO's identifier for cliente
 static char cFifoName[25];	// <client FIFO name> this client FIFO's name
+int	npb;	// <named pipe balcao> FIFO's identifier for balcao
 
 void trata_SIGPIPE(int s) {
     static int a; 
@@ -18,6 +19,14 @@ void trata_SIGINT(int i) { // CTRL + C
 	// ===== Close Pipes ===== //
 	close(npc);
 	unlink(cFifoName);
+
+	// ==== Tell Balcao I'm dead ==== //
+	imDead imDead_tblc;
+	imDead_tblc.size=sizeof(imDead_tblc);
+	imDead_tblc.pid=getpid();
+	write(npb, &imDead_tblc, sizeof(imDead_tblc));
+	/* if (debugging) */ { fprintf(stderr,"==sent imDead to npb==\n");}
+	// ==== ==================== ==== //
 
 	exit(EXIT_SUCCESS);
 }
@@ -74,7 +83,7 @@ int main(int argc, char **argv){
 	printf("Bem vindo %s!\n",argv[1]);
 
     // ===========================
-    int	npb;	// <named pipe balcao> FIFO's identifier for balcao
+    // int	npb;	// <named pipe balcao> FIFO's identifier for balcao
 	int	read_res;
 
 	strcpy(sint_toblc.nome, argv[1]); // save the client name in the sint_sint_toblc struct
@@ -128,6 +137,8 @@ int main(int argc, char **argv){
 			if (read_res == (int)sizeof(info_fblc)-sizeof(info_fblc.size)) {
 				printf("Especialidade -> %s\n", info_fblc.esp);
 				printf("Prioridade -> %d\n", info_fblc.prio);
+				printf("Num pessoas a frente -> %d\n",info_fblc.num_peopleAhead);
+				printf("Num medicos on-line -> %d\n",info_fblc.num_espOnline);
 			} else
 				printf("Resposta incompreensível: %d]\n", read_res);
 		} else {

@@ -7,6 +7,7 @@ typedef struct thread_info{
 	bool debugging;
 	int npb;
 	esp_fmed * pmed_toblc;
+	int waitTime;
 	
     // Thread for life signal
     bool t_die; // <Thread_Die>
@@ -14,16 +15,18 @@ typedef struct thread_info{
     pthread_mutex_t *pMutVida;
 }thread_info, *pthread_info;
 
+void terminate();
+
 //declared globally to terminate thread when ^C recieved
 static thread_info t_info; // static so it can't be accessed by other source files
 
 //Thread #1
 void * sinalDeVida(void * p){
 	pthread_info sinal_vida = (thread_info *) p;
-	
+	sinal_vida->waitTime = 20;
     do {
-        sleep(20);
 		pthread_mutex_lock(sinal_vida->pMutVida);
+        sleep(sinal_vida->waitTime);
         write(sinal_vida->npb, sinal_vida->pmed_toblc, sizeof(*sinal_vida->pmed_toblc));
 		if (sinal_vida->debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
 		pthread_mutex_unlock(sinal_vida->pMutVida);
@@ -45,6 +48,10 @@ void treat_SIGPIPE(int s) {
 
 void treat_SIGINT(int i) { // CTRL + C
 	(void) i;    //? necessary? Does what
+	terminate();
+}
+
+void terminate(){
 	if (pthread_equal(t_info.tid, pthread_self())){ // For life signal Thread
 		if (t_info.debugging) fprintf(stderr, "\n==treat_SIGINT Called for Life Signal Thread==\n");
 		if (t_info.debugging) fprintf(stderr, "==[Life Signal Thread] pthread_exit ing==\n");
@@ -60,11 +67,11 @@ void treat_SIGINT(int i) { // CTRL + C
 		// ===== ================= ===== //
 
 		// ==== Tell Balcao I'm dead ==== //
-		imDead_fmed imDead_tblc;
+		imDead imDead_tblc;
 		imDead_tblc.size=sizeof(imDead_tblc);
-		imDead_tblc.pid_medico=getpid();
+		imDead_tblc.pid=getpid();
 		write(npb, &imDead_tblc, sizeof(imDead_tblc));
-		if (t_info.debugging) { fprintf(stderr,"==sent imDead_tblc to npb==\n");}
+		if (t_info.debugging) { fprintf(stderr,"==sent imDead to npb==\n");}
 		// ==== ==================== ==== //
 
 		// ===== Close Pipes ===== // //?only need to close them once?
@@ -85,6 +92,10 @@ int main(int argc, char **argv){
 	unsigned short pipeMsgSize; // <pipe Message Size>
     int ret_size; //  <returned size>
 	pinfo_fblc pinfo_fblc;
+	freq_tmed freq_life_sig;
+	freq_life_sig.size = sizeof(freq_life_sig);
+	suicide suicide;
+	suicide.size = sizeof(suicide);
 
 	// ======== Checking Arguments ======== //
 	bool debugging = false;
@@ -122,7 +133,7 @@ int main(int argc, char **argv){
 	printf("Bem vindo %s!\n",argv[1]);
 
     //int	npb;	// declared globally // <named pipe balcao> FIFO's identifier for balcao
-	int	read_res;
+	int	read_res,res;
 
 	strcpy(med_toblc.nome, argv[1]); // save the medic name in the med_toblc struct
     strcpy(med_toblc.esp, argv[2]); // save the medic esp in the med_toblc struct
@@ -175,8 +186,24 @@ int main(int argc, char **argv){
 			} else
 				printf("Sem resposta ou resposta incompreensível"
 							"[bytes lidos: %d]\n", read_res);
-		} else {
-			printf("Not a info_fblc type msg\n");
+		}else if(pipeMsgSize == sizeof(freq_life_sig)){
+			if(debugging) fprintf(stderr,"==Recieved Msg Type \"freq_life_sig\"==\n");
+            res = read(npm, &(freq_life_sig.size)+1, sizeof(freq_life_sig)-sizeof(freq_life_sig.size));
+            if (res == sizeof(freq_life_sig)-sizeof(freq_life_sig.size)){
+				t_info.waitTime = freq_life_sig.freq; 
+			} else {
+				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+			}
+		}else if(pipeMsgSize == sizeof(suicide)){
+			if(debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
+            res = read(npm, &(suicide.size)+1, sizeof(suicide)-sizeof(suicide.size));
+            if (res == sizeof(suicide)-sizeof(suicide.size)){
+				terminate();
+			} else {
+				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+			}
+		}else {
+			printf("Not a recognizable msg\n");
 		}
 	}
 
