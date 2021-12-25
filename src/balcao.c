@@ -2,6 +2,7 @@
 #include "globals.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
 // Run balcao:
@@ -103,7 +104,25 @@ void * adminCommands(void * p){
                         close(npm); // FECHA LOGO O FIFO DO CLIENTE!
                         if (thread_data->debugging) fprintf(stderr, "==FIFO medico fechado==\n");
                     }
-        }else {
+        } else if (strcasecmp(usr_in,"ENCERRA\n")==0) {
+            fprintf(stdout, "Exiting...\n");
+            suicide Die_Blc;
+            Die_Blc.size = sizeof(Die_Blc);
+            // Opens clients FIFO for write
+            int npb = open(BALCAO_FIFO, O_WRONLY);
+            if (npb == -1) perror("Erro no open - Ninguém quis a resposta\n");
+            else{
+                if (g_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
+                // Send response
+                res = write(npb, &Die_Blc, sizeof(Die_Blc));
+                if (res == sizeof(Die_Blc) && g_info.debugging) // if no error
+                    fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+                else
+                    perror("erro a escrever a resposta\n");
+                close(npb); // FECHA LOGO O FIFO DO CLIENTE!
+                if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+            }
+        } else {
             fprintf(stdout, "Command not recognized\n");
         }
 
@@ -306,6 +325,10 @@ int main(int argc, char **argv,  char *envp[]){
                 if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
 
                     // ============== Communicate with Classificador (2) ============== //
+                    //sint_fcli.sintomas[strlen(sint_fcli.sintomas)] = '\n';
+                    fprintf(stderr,"%lu | %lu \n",sizeof(sint_fcli.sintomas), strlen(sint_fcli.sintomas));
+                    char du[10] = "okokokoko\n";
+                    if (debugging) {fprintf(stderr, "==Debug DU: |"); debugString(du); fprintf(stderr, "|== %lu | %lu \n", sizeof(du), strlen(du)); }
                     if(write(fd[1], sint_fcli.sintomas, strlen(sint_fcli.sintomas)) <= -1){ // write to pipe, write is waiting for amount of characters
                         printf("Error Writing\n") ; return 1; }
                     // write uses strlen to not write unecessary data as we know all the data we want to write
@@ -406,6 +429,15 @@ int main(int argc, char **argv,  char *envp[]){
                     if (debugging) fprintf(stderr, "==Showing Cli List:==\n");
                     if (debugging) show_info(g_info.cli_list);
                     if (debugging) fprintf(stderr, "====\n");
+                } else {
+                    printf("Resposta incompreensível: %d]\n", res);
+                }
+            } else if (pipeMsgSize == sizeof(suicide)) {
+                if(debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
+                suicide goodbye;
+                res = read(g_info.npb, &(goodbye.size)+1, sizeof(goodbye)-sizeof(goodbye.size));
+                if (res == sizeof(goodbye)-sizeof(goodbye.size)){
+                    terminate();
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
@@ -605,23 +637,21 @@ void tellClisToDie(plista_cli p){
     char cFifoName[50];
     int res;
     int npc;
+    if (g_info.debugging) fprintf(stderr, "==Sending kill order to clis==\n");
     do {
         sprintf(cFifoName, CLIENT_FIFO, p->pid_cliente);
-        if (g_info.debugging) fprintf(stderr, "==Nome do cliente :%s==\n",cFifoName);
 
         // Opens clients FIFO for write
         npc = open(cFifoName, O_WRONLY);
         if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
         else{
-            if (g_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
             // Send response
             res = write(npc, &Die_Clis, sizeof(Die_Clis));
             if (res == sizeof(Die_Clis) && g_info.debugging) // if no error
-                fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+                fprintf(stderr, "==success writing kill order to cli of PID: %d==\n",p->pid_cliente);
             else
                 perror("erro a escrever a resposta\n");
             close(npc); // FECHA LOGO O FIFO DO CLIENTE!
-            if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
         }
         p = p->prox;
     } while (p != NULL);   
@@ -634,23 +664,21 @@ void tellMedsToDie(plista_med p){
     char cFifoName[50];
     int res;
     int npm;
+    if (g_info.debugging) fprintf(stderr, "==Sending kill order to meds==\n");
     do {
         sprintf(cFifoName, MED_FIFO, p->pid_medico);
-        if (g_info.debugging) fprintf(stderr, "==Nome do cliente :%s==\n",cFifoName);
 
         // Opens clients FIFO for write
         npm = open(cFifoName, O_WRONLY);
         if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
         else{
-            if (g_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
             // Send response
             res = write(npm, &Die_Meds, sizeof(Die_Meds));
             if (res == sizeof(Die_Meds) && g_info.debugging) // if no error
-                fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+                fprintf(stderr, "==success writing kill order to med of PID: %d==\n",p->pid_medico);
             else
                 perror("erro a escrever a resposta\n");
             close(npm); // FECHA LOGO O FIFO DO CLIENTE!
-            if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
         }
         p = p->prox;
     } while (p != NULL);   

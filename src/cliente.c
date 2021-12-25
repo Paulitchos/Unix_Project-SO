@@ -115,10 +115,10 @@ int main(int argc, char **argv){
 		ret_size = read(STDIN_FILENO,&sint_toblc.sintomas,sizeof(sint_toblc.sintomas));
 		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); return 1; }
 		sint_toblc.sintomas[ret_size] = '\0';
-		if (debugging) {fprintf(stderr, "==read: |"); debugString(sint_toblc.sintomas); fprintf(stderr, "|==\n"); }
+		if (debugging) { fprintf(stderr, "==read: |"); debugString(sint_toblc.sintomas); fprintf(stderr, "|==\n"); }
 		fflush(stdout); // prevents keeping from sending all the information to the screen
 
-		if (!strcasecmp(sint_toblc.sintomas, "adeus"))
+		if (!strcasecmp(sint_toblc.sintomas, "adeus\n"))
 			break;
 
 		// Sends message
@@ -140,7 +140,7 @@ int main(int argc, char **argv){
 				printf("Num pessoas a frente -> %d\n",info_fblc.num_peopleAhead);
 				printf("Num medicos on-line -> %d\n",info_fblc.num_espOnline);
 			} else
-				printf("Resposta incompreensível: %d]\n", read_res);
+				printf("incomprehensible response: bytes read [%d]\n", read_res);
 		} else {
 			printf("Not a info_fblc type msg\n");
 		}

@@ -184,8 +184,7 @@ int main(int argc, char **argv){
 				printf("Nome do CLiente -> %s\n", connectCli_fblc.nome);
 				printf("Prioridade -> %d\n", connectCli_fblc.pid_cliente);
 			} else
-				printf("Sem resposta ou resposta incompreensível"
-							"[bytes lidos: %d]\n", read_res);
+				printf("incomprehensible response: bytes read [%d]\n", read_res);
 		}else if(pipeMsgSize == sizeof(freq_life_sig)){
 			if(debugging) fprintf(stderr,"==Recieved Msg Type \"freq_life_sig\"==\n");
             res = read(npm, &(freq_life_sig.size)+1, sizeof(freq_life_sig)-sizeof(freq_life_sig.size));
