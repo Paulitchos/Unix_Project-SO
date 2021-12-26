@@ -44,7 +44,7 @@ plista_cli cleanDeadCli(plista_cli p, pid_t pid);
 void terminate();
 void tellClisToDie(plista_cli p);
 void tellMedsToDie(plista_med p);
-
+void changeFrqMeds(plista_med p, int freq);
 
 typedef struct thread_global_info{
 	bool debugging;
@@ -88,27 +88,12 @@ void * adminCommands(void * p){
         }  else if(sscanf(usr_in,"DELESP %d\n",&pid_med) == 1 ){
             g_info.med_list = cleanDeadMed(thread_data->med_list, pid_med);
         }else if(sscanf(usr_in,"FREQ %hd\n",&freq_tmed.freq) == 1 ){
-            // Opens clients FIFO for write
-                    npm = open(mFifoName, O_WRONLY);
-                    if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
-                    else{
-                        if (thread_data->debugging) fprintf(stderr, "==FIFO medico aberto para WRITE==\n");
-
-                        // Send response
-                        res = write(npm, &freq_tmed, sizeof(freq_tmed));
-                        if (res == sizeof(freq_tmed) && thread_data->debugging) // if no error
-                            fprintf(stderr, "==escreveu a resposta com sucesso para medico==\n");
-                        else
-                            perror("erro a escrever a resposta\n");
-
-                        close(npm); // FECHA LOGO O FIFO DO CLIENTE!
-                        if (thread_data->debugging) fprintf(stderr, "==FIFO medico fechado==\n");
-                    }
+            changeFrqMeds(thread_data->med_list,freq_tmed.freq);
         } else if (strcasecmp(usr_in,"ENCERRA\n")==0) {
             fprintf(stdout, "Exiting...\n");
             suicide Die_Blc;
             Die_Blc.size = sizeof(Die_Blc);
-            // Opens clients FIFO for write
+            // Opens balcao FIFO for write
             int npb = open(BALCAO_FIFO, O_WRONLY);
             if (npb == -1) perror("Erro no open - Ninguém quis a resposta\n");
             else{
@@ -135,7 +120,7 @@ void trata_SIGPIPE(int s) {
     static int a; 
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
-    printf("Recebido sinal SIGPIPE %d ",a);
+    if (g_info.debugging) fprintf(stderr, "==Recebido sinal SIGPIPE %d==",a);
 }
 
 void trata_SIGINT(int i) { // CTRL + C
@@ -179,7 +164,7 @@ void terminate(){
 int main(int argc, char **argv,  char *envp[]){
 
 	// ======== Checking Arguments ======== //
-	bool debugging = false;
+	g_info.debugging = false;
 	bool success = false;
 	if (argc==1)
 		success = true;
@@ -188,7 +173,7 @@ int main(int argc, char **argv,  char *envp[]){
 			if (!(strcmp(argv[i],"--debugging")) || !(strcmp(argv[i],"-D"))){
 				printf("==Debugging mode activated==\n");
 				success = true;
-				debugging = true;
+			    g_info.debugging = true;
 				break;
 			}
 		}
@@ -203,14 +188,14 @@ int main(int argc, char **argv,  char *envp[]){
     // ============== Treat Signals ============== //
     if (signal(SIGPIPE,trata_SIGPIPE) == SIG_ERR)
         perror("\nNão foi possível configurar sinal SIGPIPE\n");
-    if (debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
+    if (g_info.debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
     if (signal(SIGINT,trata_SIGINT) == SIG_ERR) {
         perror("\nNão foi possível configurar sinal SIGINT!\n");
         exit(EXIT_FAILURE); }
-    if (debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
+    if (g_info.debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
     // ============== ============= ============== //
 
-    if (debugging) { // get current working directory
+    if (g_info.debugging) { // get current working directory
         char cwd[500];
         if (getcwd(cwd, sizeof(cwd)) != NULL) {
             fprintf(stderr, "==Current working dir: %s==\n", cwd);
@@ -297,18 +282,18 @@ int main(int argc, char **argv,  char *envp[]){
 
         res = mkfifo(BALCAO_FIFO, 0777);
         if (res == -1){	perror("\nmkfifo do FIFO do balcao deu erro"); exit(EXIT_FAILURE); }
-        if (debugging) fprintf(stderr, "==FIFO servidor criado==\n");
+        if (g_info.debugging) fprintf(stderr, "==FIFO servidor criado==\n");
 
         g_info.npb = open(BALCAO_FIFO, O_RDWR); // opens in Read/Write mode to prevent getting stuck in open, it's still blocking
         if (g_info.npb == -1){ perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n"); exit(EXIT_FAILURE);	}
-        if (debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");        
+        if (g_info.debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");        
         
         // ================ User Input ================ //
         pthread_mutex_t MutAll = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
         //pthread_mutex_t MutCli = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
         //pthread_mutex_t MutMed = PTHREAD_MUTEX_INITIALIZER;
         //global_info g_info; //declared globally
-        g_info.debugging = debugging;
+        //g_info.debugging = g_info.debugging;
         g_info.t_die = false;
         g_info.pMutAll = &MutAll;
         pthread_create(&g_info.tid, NULL, adminCommands, &g_info);
@@ -319,7 +304,7 @@ int main(int argc, char **argv,  char *envp[]){
             if (read(g_info.npb, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { 
                 printf("Error Reading, output\n"); trata_SIGINT(0); }
             if (pipeMsgSize == sizeof(sint_fcli)){
-                if(debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
+                if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
                 sint_fcli.size = sizeof(sint_fcli);
                 res = read(g_info.npb, &(sint_fcli.size)+1, (int)sizeof(sint_fcli)-sizeof(sint_fcli.size));
                 if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
@@ -330,14 +315,14 @@ int main(int argc, char **argv,  char *envp[]){
                         printf("Error Writing\n") ; return 1; }
                     // write uses strlen to not write unecessary data as we know all the data we want to write
                     
-                    if (debugging) {fprintf(stderr, "==Recebido do cliente & enviado para o classificador: |"); debugString(sint_fcli.sintomas); fprintf(stderr, "|==\n"); }
+                    if (g_info.debugging) {fprintf(stderr, "==Recebido do cliente & enviado para o classificador: |"); debugString(sint_fcli.sintomas); fprintf(stderr, "|==\n"); }
 
                     tam = read(df[0],msgClassificador,sizeof(msgClassificador)); // read from pipe, tam = sizeof(phrase if all is fine) | -1 i error while reading, 0 is unexpected EOF
                     if (tam <= -1 ) { printf("Error Reading, output: %d\n",tam); return 1; }
                     // read uses sizeof because we don't know what we'll recieve àpriori, so we send the max size of the string
                     msgClassificador[tam] = '\0';
 
-                    if (debugging) {fprintf(stderr, "==Recebido do classificador: |"); debugString(msgClassificador); fprintf(stderr, "|==\n"); }
+                    if (g_info.debugging) {fprintf(stderr, "==Recebido do classificador: |"); debugString(msgClassificador); fprintf(stderr, "|==\n"); }
                     // ============== ================================== ============== //
 
                     // Get Filename of client's FIFO to send response
@@ -345,7 +330,7 @@ int main(int argc, char **argv,  char *envp[]){
 
                     // =========== Separar a especialidade e a prioridade ===========
                     sscanf(msgClassificador,"%s %d",info_tcli.esp,&info_tcli.prio);
-                    if (debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
+                    if (g_info.debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
                     // =========== ====================================== ===========
 
                     // =========== Save in Linked List =========== //
@@ -357,42 +342,42 @@ int main(int argc, char **argv,  char *envp[]){
                     novo_cli->prio = info_tcli.prio;
                     novo_cli->prox = NULL;
                     g_info.cli_list = insert_end(g_info.cli_list, novo_cli);
-                    if (debugging) fprintf(stderr, "==Added New cli to Linked List, showing info:==\n");
-                    if (debugging) show_info(g_info.cli_list);
-                    if (debugging) fprintf(stderr, "====\n");
+                    if (g_info.debugging) fprintf(stderr, "==Added New cli to Linked List, showing info:==\n");
+                    if (g_info.debugging) show_info(g_info.cli_list);
+                    if (g_info.debugging) fprintf(stderr, "====\n");
                     // =========== =================== =========== //
 
                     info_tcli.num_peopleAhead = calc_peepAhead(novo_cli, g_info.cli_list);
-                    if (debugging) fprintf(stderr, "==people ahead: %d==\n", info_tcli.num_peopleAhead);
+                    if (g_info.debugging) fprintf(stderr, "==people ahead: %d==\n", info_tcli.num_peopleAhead);
 
                     info_tcli.num_espOnline = calc_espOnline(novo_cli, g_info.med_list);
-                    if (debugging) fprintf(stderr, "==especialistas online: %d==\n", info_tcli.num_espOnline);
+                    if (g_info.debugging) fprintf(stderr, "==especialistas online: %d==\n", info_tcli.num_espOnline);
 
                     // Opens clients FIFO for write
                     npc = open(cFifoName, O_WRONLY);
                     if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
                     else{
-                        if (debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
+                        if (g_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
 
                         // Send response
                         res = write(npc, &info_tcli, sizeof(info_tcli));
-                        if (res == sizeof(info_tcli) && debugging) // if no error
+                        if (res == sizeof(info_tcli) && g_info.debugging) // if no error
                             fprintf(stderr, "==escreveu a resposta com sucesso para cliente==\n");
                         else
                             perror("erro a escrever a resposta\n");
 
                         close(npc); // FECHA LOGO O FIFO DO CLIENTE!
-                        if (debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+                        if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
                     }
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
 
             } else if (pipeMsgSize == sizeof(esp_fmed)) {
-			    if(debugging) fprintf(stderr,"==Recieved Msg Type \"esp_fmed\"==\n");
+			    if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"esp_fmed\"==\n");
                 res = read(g_info.npb, &(esp_fmed.size)+1, (int)sizeof(esp_fmed)-sizeof(esp_fmed.size));
                 if (res == (int)sizeof(esp_fmed)-sizeof(esp_fmed.size)){
-                    if (debugging) fprintf(stderr, "==nome medico: %s | especialidade: %s==\n",esp_fmed.nome, esp_fmed.esp);
+                    if (g_info.debugging) fprintf(stderr, "==nome medico: %s | especialidade: %s==\n",esp_fmed.nome, esp_fmed.esp);
                     
                     if(medExists(esp_fmed.pid_medico,g_info.med_list)){
                         printf("LIFE SIGNAL -> %s %s %d\n", esp_fmed.nome, esp_fmed.esp, esp_fmed.pid_medico);
@@ -406,31 +391,31 @@ int main(int argc, char **argv,  char *envp[]){
                         novo_med->disponivel = 1;
                         novo_med->prox = NULL;
                         g_info.med_list = insert_end_med(g_info.med_list, novo_med);
-                        if (debugging) fprintf(stderr, "==Added New med to Linked List, showing info:==\n");
-                        if (debugging) show_info_med(g_info.med_list);
-                        if (debugging) fprintf(stderr, "====\n");
+                        if (g_info.debugging) fprintf(stderr, "==Added New med to Linked List, showing info:==\n");
+                        if (g_info.debugging) show_info_med(g_info.med_list);
+                        if (g_info.debugging) fprintf(stderr, "====\n");
                         // =========== =================== =========== //
                     }
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
             } else if (pipeMsgSize == sizeof(imDead)) {
-                if(debugging) fprintf(stderr,"==Recieved Msg Type \"imDead\"==\n");
+                if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDead\"==\n");
                 imDead deadBodyFound;
                 res = read(g_info.npb, &(deadBodyFound.size)+1, sizeof(deadBodyFound)-sizeof(deadBodyFound.size));
                 if (res == sizeof(deadBodyFound)-sizeof(deadBodyFound.size)){
                     g_info.med_list = cleanDeadMed(g_info.med_list, deadBodyFound.pid);
                     g_info.cli_list = cleanDeadCli(g_info.cli_list, deadBodyFound.pid);
-                    if (debugging) fprintf(stderr,"== Cleaned Dead Body of PID %d, showing  med List:==\n",deadBodyFound.pid);
-                    if (debugging) show_info_med(g_info.med_list);
-                    if (debugging) fprintf(stderr, "==Showing Cli List:==\n");
-                    if (debugging) show_info(g_info.cli_list);
-                    if (debugging) fprintf(stderr, "====\n");
+                    if (g_info.debugging) fprintf(stderr,"== Cleaned Dead Body of PID %d, showing  med List:==\n",deadBodyFound.pid);
+                    if (g_info.debugging) show_info_med(g_info.med_list);
+                    if (g_info.debugging) fprintf(stderr, "==Showing Cli List:==\n");
+                    if (g_info.debugging) show_info(g_info.cli_list);
+                    if (g_info.debugging) fprintf(stderr, "====\n");
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
             } else if (pipeMsgSize == sizeof(suicide)) {
-                if(debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
+                if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
                 suicide goodbye;
                 res = read(g_info.npb, &(goodbye.size)+1, sizeof(goodbye)-sizeof(goodbye.size));
                 if (res == sizeof(goodbye)-sizeof(goodbye.size)){
@@ -601,12 +586,12 @@ plista_med cleanDeadMed(plista_med p, pid_t med_pid){
 }
 
 plista_cli cleanDeadCli(plista_cli p, pid_t pid){
-    plista_med prev, curr; // <previous> <current>
+    plista_cli prev, curr; // <previous> <current>
     
     prev = NULL;
     curr = p;
     
-    while(curr!=NULL && curr->pid_medico!=pid){
+    while(curr!=NULL && curr->pid_cliente!=pid){
         prev = curr;
         curr = curr->prox;
     }
@@ -673,6 +658,34 @@ void tellMedsToDie(plista_med p){
             res = write(npm, &Die_Meds, sizeof(Die_Meds));
             if (res == sizeof(Die_Meds) && g_info.debugging) // if no error
                 fprintf(stderr, "==success writing kill order to med of PID: %d==\n",p->pid_medico);
+            else
+                perror("erro a escrever a resposta\n");
+            close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+        }
+        p = p->prox;
+    } while (p != NULL);   
+}
+
+void changeFrqMeds(plista_med p, int freq){
+    if (p == NULL) return;
+    freq_tmed freq_tallmed;
+    freq_tallmed.freq = freq;
+    freq_tallmed.size=sizeof(freq_tallmed);
+    char mFifoName[50];
+    int res;
+    int npm;
+    if (g_info.debugging) fprintf(stderr, "==Sending freq to all meds==\n");
+    do {
+        sprintf(mFifoName, MED_FIFO, p->pid_medico);
+
+        // Opens medics FIFO for write
+        npm = open(mFifoName, O_WRONLY);
+        if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+        else{
+            // Send response
+            res = write(npm, &freq_tallmed, sizeof(freq_tallmed));
+            if (res == sizeof(freq_tallmed) && g_info.debugging) // if no error
+                fprintf(stderr, "==success writing freq period to med of PID: %d==\n",p->pid_medico);
             else
                 perror("erro a escrever a resposta\n");
             close(npm); // FECHA LOGO O FIFO DO CLIENTE!

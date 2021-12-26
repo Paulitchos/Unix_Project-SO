@@ -12,7 +12,7 @@ typedef struct thread_info{
     // Thread for life signal
     bool t_die; // <Thread_Die>
     pthread_t tid; // <ThreadID>
-    pthread_mutex_t *pMutVida;
+    pthread_mutex_t *pMutAll;
 }thread_info, *pthread_info;
 
 void terminate();
@@ -25,12 +25,52 @@ void * sinalDeVida(void * p){
 	pthread_info sinal_vida = (thread_info *) p;
 	sinal_vida->waitTime = 20;
     do {
-		pthread_mutex_lock(sinal_vida->pMutVida);
+		pthread_mutex_lock(sinal_vida->pMutAll);
         sleep(sinal_vida->waitTime);
         write(sinal_vida->npb, sinal_vida->pmed_toblc, sizeof(*sinal_vida->pmed_toblc));
 		if (sinal_vida->debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
-		pthread_mutex_unlock(sinal_vida->pMutVida);
+		pthread_mutex_unlock(sinal_vida->pMutAll);
     }while (!sinal_vida->t_die);
+    pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
+}
+
+//Thread #2
+void * userInput(void * p){
+	pthread_info thread_data = (thread_info *) p;
+	int ret_size;
+	char usr_in[TAM_MAX_MSG];
+	char mFifoName[50];
+	if (thread_data->debugging) { fprintf(stderr,"==User input Thread running==\n");}
+    do {
+		//pthread_mutex_lock(thread_data->pMutAll);
+		ret_size = read(STDIN_FILENO,&usr_in,sizeof(usr_in));
+		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
+		usr_in[ret_size] = '\0';
+		usr_in[strlen(usr_in)-1] = '\n';
+		if (thread_data->debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
+		if (!strcasecmp(usr_in, "sair\n")){
+			// ==== Terminate this client ==== //
+			fprintf(stdout, "Exiting...\n");
+            suicide Die_Med;
+            Die_Med.size = sizeof(Die_Med);
+            // Opens medic FIFO for write
+			sprintf(mFifoName, MED_FIFO, getpid());
+            int npm = open(mFifoName, O_WRONLY);
+            if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+            else{
+                if (t_info.debugging) fprintf(stderr, "==FIFO cliente aberto para WRITE==\n");
+                // Send response
+                ret_size = write(npm, &Die_Med, sizeof(Die_Med));
+                if (ret_size == sizeof(Die_Med) && t_info.debugging) // if no error
+                    fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+                else
+                    perror("erro a escrever a resposta\n");
+                close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+                if (t_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+            }
+		}
+			
+	}while (!thread_data->t_die);
     pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
 }
 
@@ -43,7 +83,7 @@ void treat_SIGPIPE(int s) {
     static int a; 
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
-    fprintf(stderr, "Recebido sinal SIGPIPE %d ",a);
+    if (t_info.debugging) fprintf(stderr, "==Recebido sinal SIGPIPE %d==",a);
 }
 
 void treat_SIGINT(int i) { // CTRL + C
@@ -55,7 +95,7 @@ void terminate(){
 	if (pthread_equal(t_info.tid, pthread_self())){ // For life signal Thread
 		if (t_info.debugging) fprintf(stderr, "\n==treat_SIGINT Called for Life Signal Thread==\n");
 		if (t_info.debugging) fprintf(stderr, "==[Life Signal Thread] pthread_exit ing==\n");
-		pthread_mutex_destroy(t_info.pMutVida); //? Should this be here
+		pthread_mutex_destroy(t_info.pMutAll); //? Should this be here
 		pthread_exit(NULL);
 		// [Never Reaches this Line] //
 	} else { // For Main Thread
@@ -96,9 +136,12 @@ int main(int argc, char **argv){
 	freq_life_sig.size = sizeof(freq_life_sig);
 	suicide suicide;
 	suicide.size = sizeof(suicide);
+	pid_t pidUtenteAAtender = 0;
+	char cFifoName[50];
+	int npc;
 
 	// ======== Checking Arguments ======== //
-	bool debugging = false;
+	t_info.debugging = false;
 	bool success = false;
 	if (argc==3)
 		success = true;
@@ -107,7 +150,7 @@ int main(int argc, char **argv){
 			if (!(strcmp(argv[i],"--debugging")) || !(strcmp(argv[i],"-D"))){
 				printf("==Debugging mode activated==\n");
 				success = true;
-				debugging = true;
+				t_info.debugging = true;
 				break;
 			}
 		}
@@ -122,14 +165,14 @@ int main(int argc, char **argv){
     // ============== Treat Signals ============== //
     if (signal(SIGPIPE,treat_SIGPIPE) == SIG_ERR)
         perror("\nNão foi possível configurar sinal SIGPIPE\n");
-    if (debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
+    if (t_info.debugging) fprintf(stderr, "==Sinal SIGPIPE configurado==\n");
     if (signal(SIGINT,treat_SIGINT) == SIG_ERR) {
         perror("\nNão foi possível configurar sinal SIGINT!\n");
         exit(EXIT_FAILURE); }
-    if (debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
+    if (t_info.debugging) fprintf(stderr, "==Sinal SIGINT configurado==\n");
     // ============== ============= ============== //
 
-	if (debugging) fprintf(stderr, "==My PID is: %d==\n", getpid());
+	if (t_info.debugging) fprintf(stderr, "==My PID is: %d==\n", getpid());
 	printf("Bem vindo %s!\n",argv[1]);
 
     //int	npb;	// declared globally // <named pipe balcao> FIFO's identifier for balcao
@@ -143,42 +186,53 @@ int main(int argc, char **argv){
 	sprintf(mFifoName, MED_FIFO, med_toblc.pid_medico); // MED_FIFO = "/tmp/resp_%d_fifo"
 	if (mkfifo(mFifoName, 0b111111111) == -1){ // with 0777 first zero means octal, get converted to 0b(binary) 111 111 111, (0x is hexadecimal), 7 is 111 for rwx (read/write/execute), three sevens for ugo (owner/group/others)
 		perror("\nmkfifo FIFO medico deu erro"); exit(EXIT_FAILURE); }
-	if (debugging) fprintf(stderr, "==FIFO do medico criado, cFifoName is: |%s|==\n", mFifoName);
+	if (t_info.debugging) fprintf(stderr, "==FIFO do medico criado, cFifoName is: |%s|==\n", mFifoName);
 
 	// open balcao's FIFO for writing
 	npb = open(BALCAO_FIFO, O_WRONLY); // bloqueante
 	if (npb == -1){ // if couldn't find balcao's fifo
 		fprintf(stderr, "\nO balcao não está a correr\n"); 
 		unlink(mFifoName); exit(EXIT_FAILURE); }
-    if (debugging) fprintf(stderr, "==FIFO do balcao aberto WRITE / BLOCKING==\n");
+    if (t_info.debugging) fprintf(stderr, "==FIFO do balcao aberto WRITE / BLOCKING==\n");
 
 	// abertura read+write evita o comportamento de ficar bloqueado no open. a execução prossegue logo mas as operações read/write (neste caso APENAS READ) continuam bloqueantes						
 	npm = open(mFifoName, O_RDWR);	// bloqueante
 	if (npm == -1){ perror("\nErro ao abrir o FIFO do medico"); close(npb); unlink(mFifoName); exit(EXIT_FAILURE); }
-	if (debugging) fprintf(stderr, "==FIFO do proprio medico aberto READ(+WRITE) / BLOCKING==\n");
+	if (t_info.debugging) fprintf(stderr, "==FIFO do proprio medico aberto READ(+WRITE) / BLOCKING==\n");
 
 	// ================ Life Signal ================ //
-	pthread_mutex_t MutVida = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
+	pthread_mutex_t MutAll = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
 	//thread_info t_info; //declared globally
 	t_info.t_die = false;
 	t_info.npb = npb;
-	t_info.debugging = debugging;
+	//t_info.debugging = debugging;
 	t_info.pmed_toblc = &med_toblc;
-	t_info.pMutVida = &MutVida;
+	t_info.pMutAll = &MutAll;
 	pthread_create(&t_info.tid, NULL, sinalDeVida, &t_info);
 	// ================ =========== ================ //
 
+	// ================ User Input ================ //
+    //pthread_mutex_t MutAll = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
+    //pthread_mutex_t MutCli = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
+    //pthread_mutex_t MutMed = PTHREAD_MUTEX_INITIALIZER;
+    //global_info g_info; //declared globally
+    //g_info.debugging = g_info.debugging;
+    t_info.t_die = false;
+    t_info.pMutAll = &MutAll;
+    pthread_create(&t_info.tid, NULL, userInput, &t_info);
+    // ================ ========== ================ //
+
 	// Sends message
 	write(npb, &med_toblc, sizeof(med_toblc));
-	if (debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
+	if (t_info.debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
 
 	while (1){
 
 		// Recieves message
 		ret_size = read(npm, &pipeMsgSize, sizeof(pipeMsgSize));
 		if (pipeMsgSize == sizeof(connectCli_fblc)){
-			if(debugging) fprintf(stderr,"==Recieved Msg Type \"connectCli_fblc\"==\n");
-			if(debugging) printf("==Endereços: &connectCli_fblc: %p | old(&(connectCli_fblc.nome)): %p | (&(connectCli_fblc.size)+1): %p==\n",&connectCli_fblc, &(connectCli_fblc.nome), &(connectCli_fblc.size)+1);
+			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"connectCli_fblc\"==\n");
+			if(t_info.debugging) printf("==Endereços: &connectCli_fblc: %p | old(&(connectCli_fblc.nome)): %p | (&(connectCli_fblc.size)+1): %p==\n",&connectCli_fblc, &(connectCli_fblc.nome), &(connectCli_fblc.size)+1);
 
 			read_res = read(npm, &(connectCli_fblc.size)+1, (int)sizeof(connectCli_fblc)-sizeof(connectCli_fblc.size));
 			if (read_res == (int)sizeof(connectCli_fblc)-sizeof(connectCli_fblc.size)) {
@@ -187,7 +241,7 @@ int main(int argc, char **argv){
 			} else
 				printf("incomprehensible response: bytes read [%d]\n", read_res);
 		}else if(pipeMsgSize == sizeof(freq_life_sig)){
-			if(debugging) fprintf(stderr,"==Recieved Msg Type \"freq_life_sig\"==\n");
+			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"freq_life_sig\"==\n");
             res = read(npm, &(freq_life_sig.size)+1, sizeof(freq_life_sig)-sizeof(freq_life_sig.size));
             if (res == sizeof(freq_life_sig)-sizeof(freq_life_sig.size)){
 				t_info.waitTime = freq_life_sig.freq; 
@@ -195,10 +249,57 @@ int main(int argc, char **argv){
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
 		}else if(pipeMsgSize == sizeof(suicide)){
-			if(debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
+			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
             res = read(npm, &(suicide.size)+1, sizeof(suicide)-sizeof(suicide.size));
             if (res == sizeof(suicide)-sizeof(suicide.size)){
 				terminate();
+			} else {
+				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+			}
+		}else if(pipeMsgSize == sizeof(imDead)){ // msg with info to connect to client
+			imDead ConCli;
+			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDEad(connect to cli)\"==\n");
+            res = read(npm, &(ConCli.size)+1, sizeof(ConCli)-sizeof(ConCli.size));
+            if (res == sizeof(ConCli)-sizeof(ConCli.size)){
+				pidUtenteAAtender = ConCli.pid;
+			} else {
+				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+			}
+		}else if(pipeMsgSize == sizeof(msg)){
+			msg msgCli;
+			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"msgCli\"==\n");
+            res = read(npm, &(msgCli.size)+1, sizeof(msgCli)-sizeof(msgCli.size));
+            if (res == sizeof(msgCli)-sizeof(msgCli.size)){
+
+				if (pidUtenteAAtender == 0)
+					continue; // Ainda não se recebeu nenhuma mensagem com quem deviamos falar
+
+				// ==== Read user input ==== //
+				msg msgToCli;
+				msgToCli.size = sizeof(msgToCli);
+				ret_size = read(STDIN_FILENO,&msgToCli.msg,sizeof(msgToCli.msg));
+				if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
+				msgToCli.msg[ret_size] = '\0';
+				msgToCli.msg[strlen(msgToCli.msg)-1] = '\n';
+				if (t_info.debugging) {fprintf(stderr, "==read: |"); debugString(msgToCli.msg); fprintf(stderr, "|==\n"); }
+				// ==== =============== ==== //
+
+				// ======== msg para o cliente ======== //
+				sprintf(cFifoName, CLIENT_FIFO, pidUtenteAAtender);
+				// Opens client FIFO for write
+				npc = open(mFifoName, O_WRONLY);
+				if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
+				else{
+					// Send response
+					res = write(npc, &msgToCli, sizeof(msgToCli));
+					if (res == sizeof(msgToCli) && t_info.debugging) // if no error
+						fprintf(stderr, "==success writing freq period to cli==\n");
+					else
+						perror("erro a escrever a resposta\n");
+					close(npc); // FECHA LOGO O FIFO DO CLIENTE!
+				}
+				// ======== ================== ======== //
+
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
@@ -213,7 +314,7 @@ int main(int argc, char **argv){
 
 	t_info.t_die = true;
 	pthread_join(t_info.tid, NULL);  // Here you recieve the return value of the thread
-	pthread_mutex_destroy(t_info.pMutVida);
+	pthread_mutex_destroy(t_info.pMutAll);
 
 	return (0);
 }

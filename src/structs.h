@@ -53,4 +53,19 @@ typedef struct commitDie{
     unsigned short size;
 }suicide, *psuicide;
 
+typedef struct how_to_connect{
+    unsigned short size;
+}connect, *pconnect;
+
+typedef struct msg_entre_cli_e_med{
+    unsigned short size;
+    char msg[200];
+}msg, *pmsg;
+
+/*
+typedef struct how_to_connect_to_med{
+    unsigned short size;
+}connectMed, *pconnectMed;
+*/
+
 #endif
