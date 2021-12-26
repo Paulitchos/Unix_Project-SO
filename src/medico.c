@@ -8,6 +8,7 @@ typedef struct thread_info{
 	int npb;
 	esp_fmed * pmed_toblc;
 	int waitTime;
+	pid_t pidClienteAtender;
 	
     // Thread for life signal
     bool t_die; // <Thread_Die>
@@ -48,6 +49,25 @@ void * userInput(void * p){
 		usr_in[ret_size] = '\0';
 		usr_in[strlen(usr_in)-1] = '\n';
 		if (thread_data->debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
+		if (thread_data->pidClienteAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
+			// ======== msg para o medico ======== //
+			msg msgToCli;
+			char cFifoName[50];
+			sprintf(mFifoName, CLIENT_FIFO, t_info.pidClienteAtender);
+			// Opens medic FIFO for write
+			int npc = open(cFifoName, O_WRONLY);
+			if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
+			else{
+				// Send response
+				ret_size = write(npc, &msgToCli, sizeof(msgToCli));
+				if (ret_size == sizeof(msgToCli) && t_info.debugging) // if no error
+					fprintf(stderr, "==success writing freq period to med==\n");
+				else
+					perror("erro a escrever a resposta\n");
+				close(npc); // FECHA LOGO O FIFO DO CLIENTE!
+			}
+			// ======== ================== ======== //
+		}
 		if (!strcasecmp(usr_in, "sair\n")){
 			// ==== Terminate this client ==== //
 			fprintf(stdout, "Exiting...\n");
@@ -136,7 +156,7 @@ int main(int argc, char **argv){
 	freq_life_sig.size = sizeof(freq_life_sig);
 	suicide suicide;
 	suicide.size = sizeof(suicide);
-	pid_t pidUtenteAAtender = 0;
+	t_info.pidClienteAtender= 0;
 	char cFifoName[50];
 	int npc;
 
@@ -257,23 +277,25 @@ int main(int argc, char **argv){
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
 		}else if(pipeMsgSize == sizeof(imDead)){ // msg with info to connect to client
-			imDead ConCli;
+			imDead ConMed; // <Connect Cli>
 			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDEad(connect to cli)\"==\n");
-            res = read(npm, &(ConCli.size)+1, sizeof(ConCli)-sizeof(ConCli.size));
-            if (res == sizeof(ConCli)-sizeof(ConCli.size)){
-				pidUtenteAAtender = ConCli.pid;
+            res = read(npm, &(ConMed.size)+1, sizeof(ConMed)-sizeof(ConMed.size));
+            if (res == sizeof(ConMed)-sizeof(ConMed.size)){
+				t_info.pidClienteAtender = ConMed.pid;
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
 		}else if(pipeMsgSize == sizeof(msg)){
-			msg msgCli;
+			msg msgMed;
 			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"msgCli\"==\n");
-            res = read(npm, &(msgCli.size)+1, sizeof(msgCli)-sizeof(msgCli.size));
-            if (res == sizeof(msgCli)-sizeof(msgCli.size)){
+            res = read(npm, &(msgMed.size)+1, sizeof(msgMed)-sizeof(msgMed.size));
+            if (res == sizeof(msgMed)-sizeof(msgMed.size)){
 
-				if (pidUtenteAAtender == 0)
+				if (t_info.pidClienteAtender == 0)
 					continue; // Ainda não se recebeu nenhuma mensagem com quem deviamos falar
 
+				fprintf(stdout,"%s\n",msgMed.msg);
+			/*
 				// ==== Read user input ==== //
 				msg msgToCli;
 				msgToCli.size = sizeof(msgToCli);
@@ -285,7 +307,7 @@ int main(int argc, char **argv){
 				// ==== =============== ==== //
 
 				// ======== msg para o cliente ======== //
-				sprintf(cFifoName, CLIENT_FIFO, pidUtenteAAtender);
+				sprintf(cFifoName, CLIENT_FIFO, t_info.pidClienteAtender);
 				// Opens client FIFO for write
 				npc = open(mFifoName, O_WRONLY);
 				if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
@@ -299,7 +321,7 @@ int main(int argc, char **argv){
 					close(npc); // FECHA LOGO O FIFO DO CLIENTE!
 				}
 				// ======== ================== ======== //
-
+			*/
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}

@@ -8,6 +8,7 @@ typedef struct thread_global_info{
     int npc; // <named pipe cliente>
 	int npb;
 	char cFifoName[25];	// <client FIFO name> this client FIFO's name
+	pid_t pidMedicoAMeAtender;
 	
     // Thread for user input
     bool t_die; // <Thread_Die>
@@ -51,6 +52,25 @@ void * userInput(void * p){
                 close(npc); // FECHA LOGO O FIFO DO CLIENTE!
                 if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
             }
+		}
+		if (thread_data->pidMedicoAMeAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
+			// ======== msg para o medico ======== //
+			msg msgToMed;
+			char mFifoName[50];
+			sprintf(mFifoName, CLIENT_FIFO, g_info.pidMedicoAMeAtender);
+			// Opens medic FIFO for write
+			int npm = open(mFifoName, O_WRONLY);
+			if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+			else{
+				// Send response
+				ret_size = write(npm, &msgToMed, sizeof(msgToMed));
+				if (ret_size == sizeof(msgToMed) && g_info.debugging) // if no error
+					fprintf(stderr, "==success writing freq period to med==\n");
+				else
+					perror("erro a escrever a resposta\n");
+				close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+			}
+			// ======== ================== ======== //
 		}
 			
 	}while (!thread_data->t_die);
@@ -115,9 +135,9 @@ int main(int argc, char **argv){
 	unsigned short pipeMsgSize; // <pipe Message Size>
     int ret_size; //  <returned size>
 	pinfo_fblc pinfo_fblc;
-	pid_t pidMedicoAMeAtender = 0;
 	char mFifoName[50];
 	int npm;
+	g_info.pidMedicoAMeAtender = 0;
 
 	// ======== Checking Arguments ======== //
 	g_info.debugging = false;
@@ -240,7 +260,7 @@ int main(int argc, char **argv){
 			if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDEad(connect to cli)\"==\n");
             read_res = read(g_info.npc, &(ConCli.size)+1, sizeof(ConCli)-sizeof(ConCli.size));
             if (read_res == sizeof(ConCli)-sizeof(ConCli.size)){
-				pidMedicoAMeAtender = ConCli.pid;
+				g_info.pidMedicoAMeAtender = ConCli.pid;
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", read_res);
 			}
@@ -250,9 +270,12 @@ int main(int argc, char **argv){
             read_res = read(g_info.npc, &(msgCli.size)+1, sizeof(msgCli)-sizeof(msgCli.size));
             if (read_res == sizeof(msgCli)-sizeof(msgCli.size)){
 
-				if (pidMedicoAMeAtender == 0)
+				if (g_info.pidMedicoAMeAtender == 0)
 					continue; // Ainda não se recebeu nenhuma mensagem com quem deviamos falar
+				
+				fprintf(stdout,"%s\n",msgCli.msg);
 
+				/*
 				// ==== Read user input ==== //
 				msg msgToMed;
 				msgToMed.size = sizeof(msgToMed);
@@ -263,8 +286,8 @@ int main(int argc, char **argv){
 				if (g_info.debugging) {fprintf(stderr, "==read: |"); debugString(msgToMed.msg); fprintf(stderr, "|==\n"); }
 				// ==== =============== ==== //
 
-				// ======== msg para o cliente ======== //
-				sprintf(mFifoName, CLIENT_FIFO, pidMedicoAMeAtender);
+				// ======== msg para o medico ======== //
+				sprintf(mFifoName, CLIENT_FIFO, g_info.pidMedicoAMeAtender);
 				// Opens medic FIFO for write
 				npm = open(mFifoName, O_WRONLY);
 				if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
@@ -278,6 +301,7 @@ int main(int argc, char **argv){
 					close(npm); // FECHA LOGO O FIFO DO CLIENTE!
 				}
 				// ======== ================== ======== //
+				*/
 
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", ret_size);
