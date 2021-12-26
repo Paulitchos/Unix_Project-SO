@@ -45,6 +45,9 @@ void terminate();
 void tellClisToDie(plista_cli p);
 void tellMedsToDie(plista_med p);
 void changeFrqMeds(plista_med p, int freq);
+void makeEmTalk(plista_med pm, plista_cli pc);
+void sendConnect(pid_t pid, char * FifoName);
+void sendConnectToCli(pid_t pidCli);
 
 typedef struct thread_global_info{
 	bool debugging;
@@ -369,6 +372,7 @@ int main(int argc, char **argv,  char *envp[]){
                         close(npc); // FECHA LOGO O FIFO DO CLIENTE!
                         if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
                     }
+                    makeEmTalk(g_info.cli_list, g_info.med_list);
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
@@ -636,7 +640,7 @@ void tellClisToDie(plista_cli p){
             close(npc); // FECHA LOGO O FIFO DO CLIENTE!
         }
         p = p->prox;
-    } while (p != NULL);   
+    } while (p != NULL);
 }
 
 void tellMedsToDie(plista_med p){
@@ -692,4 +696,50 @@ void changeFrqMeds(plista_med p, int freq){
         }
         p = p->prox;
     } while (p != NULL);   
+}
+
+void makeEmTalk(plista_med pm, plista_cli pc){
+    if (g_info.debugging) fprintf(stderr, "==Making Them Talk to each other==\n");
+    if (pm == NULL || pc == NULL) return;
+    plista_med pauxm = pm; 
+    plista_cli pauxc = pc;
+    // Go through clients
+    do {
+        
+        // Go through medics
+        do{
+            
+            // If a match occurs:
+            if (g_info.debugging) fprintf(stderr, "==Match! med: %d, cli: %d==\n", pauxm->pid_medico, pauxc->pid_cliente);
+            char mFifoName[50]; sprintf(mFifoName, MED_FIFO, pauxm->pid_medico);
+            char cFifoName[50]; sprintf(cFifoName, CLIENT_FIFO, pauxc->pid_cliente);
+            sendConnect(pauxc->pid_cliente, cFifoName);
+            sendConnect(pauxm->pid_medico, mFifoName);
+
+            pauxm = pauxm->prox;
+        } while (pauxm != NULL);
+        pauxc = pc;
+
+        pauxc = pauxc->prox;
+    } while (pauxc != NULL);
+}
+
+// sendConnect(<PID of guy who he'll talk to>, <Fifo Name of who he have to send the connect message>)
+void sendConnect(pid_t pid, char * FifoName){
+    imDead connectToMed; // struct used to send connect order
+    connectToMed.size = sizeof(connectToMed);
+    connectToMed.pid = pid;
+
+    // Opens medics FIFO for write
+    int npm = open(FifoName, O_WRONLY);
+    if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+    else{
+        // Send response
+        int res = write(npm, &connectToMed, sizeof(connectToMed));
+        if (res == sizeof(connectToMed) && g_info.debugging) // if no error
+            fprintf(stderr, "==success writing connect order to: %d==\n",pid);
+        else
+            perror("erro a escrever a resposta\n");
+        close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+    }
 }

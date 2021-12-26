@@ -55,6 +55,7 @@ typedef struct commitDie{
 
 typedef struct how_to_connect{
     unsigned short size;
+    
 }connect, *pconnect;
 
 typedef struct msg_entre_cli_e_med{
