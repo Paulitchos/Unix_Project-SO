@@ -117,7 +117,7 @@ int main(int argc, char **argv){
 		sint_toblc.sintomas[ret_size] = '\0';
 		if (debugging) { fprintf(stderr, "==read: |"); debugString(sint_toblc.sintomas); fprintf(stderr, "|==\n"); }
 		fflush(stdout); // prevents keeping from sending all the information to the screen
-
+		
 		if (!strcasecmp(sint_toblc.sintomas, "adeus\n"))
 			break;
 

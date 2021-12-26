@@ -168,10 +168,11 @@ int main(int argc, char **argv){
 	pthread_create(&t_info.tid, NULL, sinalDeVida, &t_info);
 	// ================ =========== ================ //
 
+	// Sends message
+	write(npb, &med_toblc, sizeof(med_toblc));
+	if (debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
+
 	while (1){
-		// Sends message
-		write(npb, &med_toblc, sizeof(med_toblc));
-		if (debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
 
 		// Recieves message
 		ret_size = read(npm, &pipeMsgSize, sizeof(pipeMsgSize));

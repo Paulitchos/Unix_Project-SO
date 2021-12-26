@@ -123,7 +123,7 @@ void * adminCommands(void * p){
                 if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
             }
         } else {
-            fprintf(stdout, "Command not recognized\n");
+            fprintf(stdout, "Command not recognized, available commands are:\nUTENTES, ESPECIALISTAS, DELUT <PID>, DELESP <PID>, FREQ <Period>, ENCERRA\n");
         }
 
 		pthread_mutex_unlock(thread_data->pMutAll);
@@ -325,10 +325,7 @@ int main(int argc, char **argv,  char *envp[]){
                 if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
 
                     // ============== Communicate with Classificador (2) ============== //
-                    //sint_fcli.sintomas[strlen(sint_fcli.sintomas)] = '\n';
-                    fprintf(stderr,"%lu | %lu \n",sizeof(sint_fcli.sintomas), strlen(sint_fcli.sintomas));
-                    char du[10] = "okokokoko\n";
-                    if (debugging) {fprintf(stderr, "==Debug DU: |"); debugString(du); fprintf(stderr, "|== %lu | %lu \n", sizeof(du), strlen(du)); }
+                    sint_fcli.sintomas[strlen(sint_fcli.sintomas)-1] = '\n';
                     if(write(fd[1], sint_fcli.sintomas, strlen(sint_fcli.sintomas)) <= -1){ // write to pipe, write is waiting for amount of characters
                         printf("Error Writing\n") ; return 1; }
                     // write uses strlen to not write unecessary data as we know all the data we want to write
