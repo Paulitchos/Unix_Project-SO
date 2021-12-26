@@ -17,6 +17,7 @@ typedef struct listaclientes lista_cli, *plista_cli;
     char nome[50];
     char esp[20];
     int prio;
+    bool atendido; // perguntar se pode utilizar
     plista_cli prox;
 };
 
@@ -344,6 +345,7 @@ int main(int argc, char **argv,  char *envp[]){
                     strcpy(novo_cli->esp, info_tcli.esp);
                     novo_cli->prio = info_tcli.prio;
                     novo_cli->prox = NULL;
+                    novo_cli->atendido = false;
                     g_info.cli_list = insert_end(g_info.cli_list, novo_cli);
                     if (g_info.debugging) fprintf(stderr, "==Added New cli to Linked List, showing info:==\n");
                     if (g_info.debugging) show_info(g_info.cli_list);
@@ -372,7 +374,7 @@ int main(int argc, char **argv,  char *envp[]){
                         close(npc); // FECHA LOGO O FIFO DO CLIENTE!
                         if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
                     }
-                    makeEmTalk(g_info.cli_list, g_info.med_list);
+                    makeEmTalk(g_info.med_list, g_info.cli_list);
                 } else {
                     printf("Resposta incompreensível: %d]\n", res);
                 }
@@ -704,24 +706,33 @@ void makeEmTalk(plista_med pm, plista_cli pc){
     plista_med pauxm = pm; 
     plista_cli pauxc = pc;
     // Go through clients
-    do {
-        
-        // Go through medics
-        do{
-            
-            // If a match occurs:
-            if (g_info.debugging) fprintf(stderr, "==Match! med: %d, cli: %d==\n", pauxm->pid_medico, pauxc->pid_cliente);
-            char mFifoName[50]; sprintf(mFifoName, MED_FIFO, pauxm->pid_medico);
-            char cFifoName[50]; sprintf(cFifoName, CLIENT_FIFO, pauxc->pid_cliente);
-            sendConnect(pauxc->pid_cliente, cFifoName);
-            sendConnect(pauxm->pid_medico, mFifoName);
+    for (int prio = 1; prio <= 3; prio++) {
+        do {
+            if (pauxc->prio!=prio)
+                continue;
+            if (pauxc->atendido)
+                continue;
+            // Go through medics
+            do{
+                
+                if (pauxm->disponivel && pauxm->esp==pauxc->esp){
+                    // If a match occurs:
+                    if (g_info.debugging) fprintf(stderr, "==Match! med: %d, cli: %d==\n", pauxm->pid_medico, pauxc->pid_cliente);
+                    pauxc->atendido = true;
+                    char mFifoName[50]; sprintf(mFifoName, MED_FIFO, pauxm->pid_medico);
+                    char cFifoName[50]; sprintf(cFifoName, CLIENT_FIFO, pauxc->pid_cliente);
+                    sendConnect(pauxc->pid_cliente, cFifoName);
+                    sendConnect(pauxm->pid_medico, mFifoName);
+                    break;
+                }
+                
+                pauxm = pauxm->prox;
+            } while (pauxm != NULL);
+            pauxc = pc;
 
-            pauxm = pauxm->prox;
-        } while (pauxm != NULL);
-        pauxc = pc;
-
-        pauxc = pauxc->prox;
-    } while (pauxc != NULL);
+            pauxc = pauxc->prox;
+        } while (pauxc != NULL);
+    }
 }
 
 // sendConnect(<PID of guy who he'll talk to>, <Fifo Name of who he have to send the connect message>)
