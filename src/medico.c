@@ -202,7 +202,7 @@ int main(int argc, char **argv){
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
-		}else {
+		} else {
 			printf("Not a recognizable msg\n");
 		}
 	}
