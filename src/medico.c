@@ -104,6 +104,9 @@ void treat_SIGPIPE(int s) {
     a++;
     //SIGPIPE is the "broken pipe" signal, which is sent to a process when it attempts to write to a pipe whose read end has closed (or when it attempts to write to a socket that is no longer open for reading), but not vice versa. The default action is to terminate the process.
     if (t_info.debugging) fprintf(stderr, "==Recebido sinal SIGPIPE %d==",a);
+	if (pthread_equal(t_info.tid, pthread_self())){ // For life signal Thread
+		if (t_info.debugging) fprintf(stderr, "==Seems Like Balcao isn't working anymore, leaving...==\n");
+	}
 }
 
 void treat_SIGINT(int i) { // CTRL + C
