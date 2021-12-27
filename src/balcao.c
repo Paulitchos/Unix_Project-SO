@@ -708,12 +708,14 @@ void makeEmTalk(plista_med pm, plista_cli pc){
     // Go through clients
     for (int prio = 1; prio <= 3; prio++) {
         do {
+            pauxc = pauxc->prox;
             if (pauxc->prio!=prio)
                 continue;
             if (pauxc->atendido)
                 continue;
             // Go through medics
             do{
+                pauxm = pauxm->prox;
                 
                 if (pauxm->disponivel && pauxm->esp==pauxc->esp){
                     // If a match occurs:
@@ -725,13 +727,13 @@ void makeEmTalk(plista_med pm, plista_cli pc){
                     sendConnect(pauxm->pid_medico, mFifoName);
                     break;
                 }
-                
-                pauxm = pauxm->prox;
-            } while (pauxm != NULL);
-            pauxc = pc;
 
-            pauxc = pauxc->prox;
-        } while (pauxc != NULL);
+                
+            } while (pauxm->prox != NULL);
+            pauxm = pm;
+
+        } while (pauxc->prox != NULL);
+        pauxc = pc;
     }
 }
 
