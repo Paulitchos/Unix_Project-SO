@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${fileDirname}/../dist/${fileBasenameNoExtension}",
-            "args": ["Paulo", "-D"],
+            "args": ["Paulo", "estomatologia", "-D"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

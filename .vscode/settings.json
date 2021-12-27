@@ -5,6 +5,8 @@
         "bitset": "c",
         "string_view": "c",
         "initializer_list": "c",
-        "utility": "c"
+        "utility": "c",
+        "string.h": "c",
+        "select.h": "c"
     }
 }

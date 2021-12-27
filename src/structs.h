@@ -55,18 +55,16 @@ typedef struct commitDie{
 
 typedef struct how_to_connect{
     unsigned short size;
-    
 }connect, *pconnect;
 
 typedef struct msg_entre_cli_e_med{
     unsigned short size;
-    char msg[200];
+    char msg[TAM_MAX_MSG];
 }msg, *pmsg;
 
-/*
-typedef struct how_to_connect_to_med{
-    unsigned short size;
-}connectMed, *pconnectMed;
-*/
+typedef struct I_am_free{ // struct ID: 20000
+    unsigned short id;
+    pid_t pid;
+}available, *pavailable;
 
 #endif

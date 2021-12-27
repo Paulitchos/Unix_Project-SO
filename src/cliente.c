@@ -34,6 +34,30 @@ void * userInput(void * p){
 		usr_in[ret_size] = '\0';
 		usr_in[strlen(usr_in)-1] = '\n';
 		if (thread_data->debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
+		if (thread_data->pidMedicoAMeAtender!=0 && thread_data->pidMedicoAMeAtender!=1){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
+			// ======== msg para o medico ======== //
+			msg msgToMed;
+			msgToMed.size = sizeof(msg);
+			strcpy(msgToMed.msg, usr_in);
+			char mFifoName[50];
+			sprintf(mFifoName, MED_FIFO, thread_data->pidMedicoAMeAtender);
+			// Opens medic FIFO for write
+			fprintf(stderr, "%s | %d\n", mFifoName, thread_data->pidMedicoAMeAtender);
+			int npm = open(mFifoName, O_WRONLY);
+			if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
+			else{
+				// Send response
+				ret_size = write(npm, &msgToMed, sizeof(msgToMed));
+				if (ret_size == sizeof(msgToMed) && g_info.debugging) // if no error
+					fprintf(stderr, "==success writing msg to med==\n");
+				else
+					perror("erro a escrever a resposta\n");
+				close(npm); // FECHA LOGO O FIFO DO CLIENTE!
+			}
+			// ======== ================== ======== //
+		} else if (thread_data->pidMedicoAMeAtender==1){
+			fprintf(stderr, "A sua consulta acabou, escreva \"adeus\" para sair\n");
+		}
 		if (!strcasecmp(usr_in, "adeus\n")){
 			// ==== Terminate this client ==== //
 			fprintf(stdout, "Exiting...\n");
@@ -53,28 +77,6 @@ void * userInput(void * p){
                 close(npc); // FECHA LOGO O FIFO DO CLIENTE!
                 if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
             }
-		}
-		if (thread_data->pidMedicoAMeAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
-			// ======== msg para o medico ======== //
-			msg msgToMed;
-			msgToMed.size = sizeof(msgToMed);
-			strcpy(msgToMed.msg, usr_in);
-			char mFifoName[50];
-			sprintf(mFifoName, MED_FIFO, thread_data->pidMedicoAMeAtender);
-			// Opens medic FIFO for write
-			fprintf(stderr, "%s | %d\n", mFifoName, thread_data->pidMedicoAMeAtender);
-			int npm = open(mFifoName, O_WRONLY);
-			if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
-			else{
-				// Send response
-				ret_size = write(npm, &msgToMed, sizeof(msgToMed));
-				if (ret_size == sizeof(msgToMed) && g_info.debugging) // if no error
-					fprintf(stderr, "==success writing msg to med==\n");
-				else
-					perror("erro a escrever a resposta\n");
-				close(npm); // FECHA LOGO O FIFO DO CLIENTE!
-			}
-			// ======== ================== ======== //
 		}
 			
 	}while (!thread_data->t_die);
@@ -195,7 +197,7 @@ int main(int argc, char **argv){
 	g_info.npb = open(BALCAO_FIFO, O_WRONLY); // bloqueante
 	if (g_info.npb == -1){ // if couldn't find balcao's fifo
 		fprintf(stderr, "\nO balcao não está a correr\n"); 
-		unlink(g_info.cFifoName); exit(EXIT_FAILURE); }
+		unlink(g_info.cFifoName); exit(EXIT_SUCCESS); }
     if (g_info.debugging) fprintf(stderr, "==FIFO do balcao aberto WRITE / BLOCKING==\n");
 
 	// abertura read+write evita o comportamento de ficar bloqueado no open. a execução prossegue logo mas as operações read/write (neste caso APENAS READ) continuam bloqueantes						
@@ -279,6 +281,13 @@ int main(int argc, char **argv){
 				
 				fprintf(stdout,"%s",msgCli.msg);
 
+				if (strcasecmp("adeus\n", msgCli.msg)==0 || strcasecmp("sair\n", msgCli.msg)==0 ){
+					// ==== Consulta terminou ==== //
+					fprintf(stdout, "Ending Appointment...\n");
+
+					g_info.pidMedicoAMeAtender = 1;
+				}
+
 				/*
 				// ==== Read user input ==== //
 				msg msgToMed;
@@ -311,7 +320,7 @@ int main(int argc, char **argv){
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", ret_size);
 			}
 		} else {
-			printf("Not a recognizable msg\n");
+			printf("Not a recognizable msg, pipeMsgSize: %d, sizeof(msg): %d\n", pipeMsgSize, (int)sizeof(msg));
 		}
 	}
 

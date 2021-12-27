@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 // Run balcao:
 /*
@@ -49,12 +50,15 @@ void changeFrqMeds(plista_med p, int freq);
 void makeEmTalk(plista_med pm, plista_cli pc);
 void sendConnect(pid_t pid, char * FifoName);
 void sendConnectToCli(pid_t pidCli);
+int makeMedAvailable(plista_med, pid_t);
+void listaespera(plista_cli p);
 
 typedef struct thread_global_info{
 	bool debugging;
     plista_cli cli_list;
 	plista_med med_list;
     int npb; // <named pipe balcao>
+    int waitingdisplay;
 	
     // Thread for user input
     bool t_die; // <Thread_Die>
@@ -62,37 +66,60 @@ typedef struct thread_global_info{
     pthread_mutex_t *pMutAll;
 }global_info, *pglobal_info;
 
+typedef struct help{
+    lista_cli * * cli_list;
+	lista_med * * med_list;
+    int * waitingdisplay;
+	
+    // Thread
+    bool t_die; // <Thread_Die>
+    // pthread_t tid; // <ThreadID> // You can't equal two thread IDs? wqual a global one to the one inside the struct
+    pthread_mutex_t *pMutAll;
+}thrds, *pthrds;
+
 // declared globally to terminate thread when ^C recieved
 // static so it can't be accessed by other source files
 static global_info g_info; // <Global_Info>
+pthread_t tid[2]; // <ThreadID>
+
+void * waitingline(void * p){
+	pthrds waitingline = (thrds *) p;
+    do {
+        sleep(*waitingline->waitingdisplay);
+        listaespera(*waitingline->cli_list);
+		if (g_info.debugging) { fprintf(stderr,"==display da lista de espera==\n");}
+    }while (!waitingline->t_die);
+    pthread_exit(NULL); // you can return something like a struct, (careful not to return a local variable)
+}
 
 void * adminCommands(void * p){
-	pglobal_info thread_data = (global_info *) p;
+	pthrds thread_data = (thrds *) p;
     freq_tmed freq_tmed;
     freq_tmed.size = sizeof(freq_tmed);
     int ret_size,npm,res;
     pid_t pid_cli,pid_med;
     char usr_in[TAM_MAX_MSG],mFifoName[50]; // <User_Input>
-    if (thread_data->debugging) { fprintf(stderr,"==User input Thread running==\n");}
+    if (g_info.debugging) { fprintf(stderr,"==User input Thread running==\n");}
     do {
         ret_size = read(STDIN_FILENO,&usr_in,sizeof(usr_in));
 		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
 		usr_in[ret_size] = '\0';
         pthread_mutex_lock(thread_data->pMutAll);
-		if (thread_data->debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
+		if (g_info.debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
 
         if(!strcasecmp(usr_in, "UTENTES\n")){
-            if (thread_data->cli_list == NULL) {fprintf(stdout, "Não há utentes para mostrar\n");}
-            show_info(thread_data->cli_list);
+            if (*thread_data->cli_list == NULL) {fprintf(stdout, "Não há utentes para mostrar\n");}
+            show_info(*thread_data->cli_list);
         } else if(!strcasecmp(usr_in, "ESPECIALISTAS\n")){
-            if (thread_data->med_list == NULL) {fprintf(stdout, "Não há especialistas para mostrar\n");}
-            show_info_med(thread_data->med_list);
+            if (*thread_data->med_list == NULL) {fprintf(stdout, "Não há especialistas para mostrar\n");}
+            show_info_med(*thread_data->med_list);
         } else if(sscanf(usr_in,"DELUT %d\n",&pid_cli) == 1 ){
-            g_info.cli_list = cleanDeadCli(thread_data->cli_list, pid_cli);
+            g_info.cli_list = cleanDeadCli(*thread_data->cli_list, pid_cli);
         }  else if(sscanf(usr_in,"DELESP %d\n",&pid_med) == 1 ){
-            g_info.med_list = cleanDeadMed(thread_data->med_list, pid_med);
-        }else if(sscanf(usr_in,"FREQ %hd\n",&freq_tmed.freq) == 1 ){
-            changeFrqMeds(thread_data->med_list,freq_tmed.freq);
+            g_info.med_list = cleanDeadMed(*thread_data->med_list, pid_med);
+        }else if(sscanf(usr_in,"FREQ MED %hd\n",&freq_tmed.freq) == 1 ){
+            changeFrqMeds(*thread_data->med_list,freq_tmed.freq);
+        }else if(sscanf(usr_in,"FREQ %d\n",&*thread_data->waitingdisplay) == 1 ){
         } else if (strcasecmp(usr_in,"ENCERRA\n")==0) {
             fprintf(stdout, "Exiting...\n");
             suicide Die_Blc;
@@ -105,14 +132,14 @@ void * adminCommands(void * p){
                 // Send response
                 res = write(npb, &Die_Blc, sizeof(Die_Blc));
                 if (res == sizeof(Die_Blc) && g_info.debugging) // if no error
-                    fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
+                    fprintf(stderr, "==escreveu a ordem de morte com sucesso para BALCAO==\n");
                 else
                     perror("erro a escrever a resposta\n");
                 close(npb); // FECHA LOGO O FIFO DO CLIENTE!
                 if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
             }
         } else {
-            fprintf(stdout, "Command not recognized, available commands are:\nUTENTES, ESPECIALISTAS, DELUT <PID>, DELESP <PID>, FREQ <Period>, ENCERRA\n");
+            fprintf(stdout, "Command not recognized, available commands are:\nUTENTES, ESPECIALISTAS, DELUT <PID>, DELESP <PID>, FREQ MED <Period>, FREQ <Period>, ENCERRA\n");
         }
 
 		pthread_mutex_unlock(thread_data->pMutAll);
@@ -133,10 +160,10 @@ void trata_SIGINT(int i) { // CTRL + C
 }
 
 void terminate(){
-    if (pthread_equal(g_info.tid, pthread_self())){ // For User Input Thread
-		if (g_info.debugging) fprintf(stderr, "==terminate Called for User Input Thread==\n");
+    if (pthread_equal(tid[1], pthread_self())){ // For User Input Thread
+		if (g_info.debugging) fprintf(stderr, "==terminate Called for a thread==\n");
 		if (g_info.debugging) fprintf(stderr, "==[User Input Thread] pthread_exit ing==\n");
-		pthread_mutex_destroy(g_info.pMutAll); //? Should this be here
+		//pthread_mutex_destroy(tid.pMutAll); //? Should this be here
 		pthread_exit(NULL);
 		// [Never Reaches this Line] //
 	} else { // For Main Thread
@@ -144,7 +171,9 @@ void terminate(){
 
 		// ===== Terminate Threads ===== //
 		if (g_info.debugging) fprintf(stderr, "==[Main Thread] Sending SIGINT to User Input Thread==\n");
-    	pthread_kill(g_info.tid, SIGINT);
+    	pthread_kill(tid[0], SIGINT); // maybe this? Mayyyyyybe
+        pthread_kill(tid[1], SIGINT);
+        //pthread_kill(g_info.tid, SIGINT);
 		// ===== ================= ===== //
 
 		// ==== Tell Everyone to die ==== //
@@ -292,16 +321,44 @@ int main(int argc, char **argv,  char *envp[]){
         if (g_info.npb == -1){ perror("\nErro ao abrir o FIFO do servidor (RDWR/blocking)\n"); exit(EXIT_FAILURE);	}
         if (g_info.debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");        
         
-        // ================ User Input ================ //
+
+        thrds td[2];
+        lista_cli ** ppnovo_cli = &g_info.cli_list;
+        lista_med ** ppnovo_med = &g_info.med_list;
+        int waitingdisplay = 30;
+        int * pwaitingdisplay =  &waitingdisplay;
+        
+        
         pthread_mutex_t MutAll = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
         //pthread_mutex_t MutCli = PTHREAD_MUTEX_INITIALIZER; // dont need to do pthread_mutex_init anymore
         //pthread_mutex_t MutMed = PTHREAD_MUTEX_INITIALIZER;
         //global_info g_info; //declared globally
         //g_info.debugging = g_info.debugging;
-        g_info.t_die = false;
-        g_info.pMutAll = &MutAll;
-        pthread_create(&g_info.tid, NULL, adminCommands, &g_info);
+
+        // ================ waiting line ================ //
+        td[1].t_die = 0;
+        td[1].waitingdisplay = pwaitingdisplay;
+        td[1].pMutAll = &MutAll;
+        td[1].cli_list = ppnovo_cli;
+        td[1].med_list = ppnovo_med;
+
+        //tid[1] = td[1].tid;
+        pthread_create(&tid[1], NULL, waitingline, &td[1]);
+        
+        // ================ ============ ================ //
+
+        // ================ User Input ================ //
+        td[0].t_die = false;
+        td[0].waitingdisplay = pwaitingdisplay;
+        td[0].pMutAll = &MutAll;
+        td[0].cli_list = ppnovo_cli;
+        td[0].med_list = ppnovo_med;
+
+        //tid[0] = td[0].tid;
+        pthread_create(&tid[0], NULL, adminCommands, &td[0]);
+        
         // ================ ========== ================ //
+        if (g_info.debugging) fprintf(stderr, "==Threads created==\n==Thread IDs: %lu %lu %lu==\n",tid[0], tid[1], pthread_self());
 
         do{
             // Recieve simptoms from cliente
@@ -376,7 +433,7 @@ int main(int argc, char **argv,  char *envp[]){
                     }
                     makeEmTalk(g_info.med_list, g_info.cli_list);
                 } else {
-                    printf("Resposta incompreensível: %d]\n", res);
+                    printf("incomprehensible response: bytes read [%d]\n", res);
                 }
 
             } else if (pipeMsgSize == sizeof(esp_fmed)) {
@@ -401,9 +458,10 @@ int main(int argc, char **argv,  char *envp[]){
                         if (g_info.debugging) show_info_med(g_info.med_list);
                         if (g_info.debugging) fprintf(stderr, "====\n");
                         // =========== =================== =========== //
+                        makeEmTalk(g_info.med_list, g_info.cli_list);
                     }
                 } else {
-                    printf("Resposta incompreensível: %d]\n", res);
+                    printf("incomprehensible response: bytes read [%d]\n", res);
                 }
             } else if (pipeMsgSize == sizeof(imDead)) {
                 if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDead\"==\n");
@@ -418,7 +476,7 @@ int main(int argc, char **argv,  char *envp[]){
                     if (g_info.debugging) show_info(g_info.cli_list);
                     if (g_info.debugging) fprintf(stderr, "====\n");
                 } else {
-                    printf("Resposta incompreensível: %d]\n", res);
+                    printf("incomprehensible response: bytes read [%d]\n", res);
                 }
             } else if (pipeMsgSize == sizeof(suicide)) {
                 if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
@@ -427,7 +485,20 @@ int main(int argc, char **argv,  char *envp[]){
                 if (res == sizeof(goodbye)-sizeof(goodbye.size)){
                     terminate();
                 } else {
-                    printf("Resposta incompreensível: %d]\n", res);
+                    printf("incomprehensible response: bytes read [%d]\n", res);
+                }
+            } else if (pipeMsgSize == 20000) { // ID for struct type available
+                if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"available\"==\n");
+                available med_available;
+                med_available.id = 20000;
+                res = read(g_info.npb, &(med_available.id)+1, sizeof(med_available)-sizeof(med_available.id));
+                if (res == sizeof(med_available)-sizeof(med_available.id)){
+                    if (makeMedAvailable(g_info.med_list, med_available.pid) <= -1){
+                        if (g_info.debugging) fprintf(stderr, "==Erro. Medico %d==\n", med_available.pid);
+                    } else if (g_info.debugging) fprintf(stderr, "==Medico %d agora disponivel==\n", med_available.pid);
+                    makeEmTalk(g_info.med_list, g_info.cli_list);
+                } else {
+                    printf("incomprehensible response: bytes read [%d]\n", res);
                 }
             } else {
                 fprintf(stderr,"No recognizable message recieved from pipe, aborting\n");
@@ -449,7 +520,7 @@ unsigned int calc_peepAhead(plista_cli cli, plista_cli p){ // only counts peeps 
         return 0;
     else if (cli->pid_cliente == p->pid_cliente)
         return 0;
-            
+
     do {
         if ( strcmp(p->esp,cli->esp) == 0)
             c++;
@@ -562,6 +633,31 @@ void show_info_med(plista_med p){
         fprintf(stderr, "%d\t%s\t%s\t%d\n", p->pid_medico, p->nome, p->esp, p->disponivel);
         p = p->prox;
     }
+}
+
+void listaespera(plista_cli p){  
+    plista_cli pauxc = p;
+    if (p == NULL) return;
+    // Go through clients
+    for (int esp = 1; esp <= 5; esp++) {
+        do {
+            if (pauxc->atendido == false){
+                if(esp == 1 && strcmp(pauxc->esp,"geral")==0){
+                    printf("========== Geral ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                } else if(esp == 2 && strcmp(pauxc->esp,"estomatologia")==0){
+                    printf("========== Estomatologia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                } else if(esp == 3 && strcmp(pauxc->esp,"neurologia")==0){
+                    printf("========== Neurologia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                } else if(esp == 4 && strcmp(pauxc->esp,"ortopedia")==0){
+                    printf("========== Ortopedia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                } else if(esp == 5 && strcmp(pauxc->esp,"oftalmologia")==0){
+                    printf("========== Oftalmologia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);}
+            }
+            pauxc = pauxc->prox;
+        } while (pauxc != NULL);
+        pauxc = p;
+    }           
+     p = p->prox;
 }
 
 plista_med cleanDeadMed(plista_med p, pid_t med_pid){
@@ -701,7 +797,7 @@ void changeFrqMeds(plista_med p, int freq){
 }
 
 void makeEmTalk(plista_med pm, plista_cli pc){
-    if (g_info.debugging) fprintf(stderr, "==Making People Talk to each other==\n");
+    if (g_info.debugging) fprintf(stderr, "==makeEmTalk called==\n");
     if (pm == NULL || pc == NULL) return;
     plista_med pauxm = pm; 
     plista_cli pauxc = pc;
@@ -755,4 +851,16 @@ void sendConnect(pid_t pid, char * FifoName){
             perror("erro a escrever a resposta\n");
         close(npm); // FECHA LOGO O FIFO DO CLIENTE!
     }
+}
+
+int makeMedAvailable(plista_med p, pid_t pid){
+    if (p == NULL) return -2;
+    do {
+        if ( !p->disponivel )
+            p->disponivel = true;
+        else 
+            return -1;
+        p = p->prox;
+    } while (p != NULL);
+    return 1;
 }

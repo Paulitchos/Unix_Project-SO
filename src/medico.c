@@ -1,6 +1,7 @@
 #include "structs.h"
 #include "globals.h"
 #include <stdbool.h>
+#include <strings.h>
 #include <unistd.h>
 
 typedef struct thread_info{
@@ -32,7 +33,7 @@ void * sinalDeVida(void * p){
 		if (sinal_vida->debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
 		pthread_mutex_unlock(sinal_vida->pMutAll);
     }while (!sinal_vida->t_die);
-    pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
+    pthread_exit(NULL); // you can return something like a struct, (careful not to return a local variable)
 }
 
 //Thread #2
@@ -49,10 +50,10 @@ void * userInput(void * p){
 		usr_in[ret_size] = '\0';
 		usr_in[strlen(usr_in)-1] = '\n';
 		if (thread_data->debugging) {fprintf(stderr, "==read: |"); debugString(usr_in); fprintf(stderr, "|==\n"); }
-		if (thread_data->pidClienteAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
+		if (thread_data->pidClienteAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o cli
 			// ======== msg para o medico ======== //
 			msg msgToCli;
-			msgToCli.size = sizeof(msgToCli);
+			msgToCli.size = sizeof(msg);
 			strcpy(msgToCli.msg, usr_in);
 			sprintf(mFifoName, CLIENT_FIFO, thread_data->pidClienteAtender);
 			// Opens client FIFO for write
@@ -68,9 +69,20 @@ void * userInput(void * p){
 				close(npc); // FECHA LOGO O FIFO DO CLIENTE!
 			}
 			// ======== ================== ======== //
+			if (!strcasecmp(usr_in, "adeus\n")){
+				// ==== Termina a consulta ==== //
+				fprintf(stdout, "Ending Appointment...\n");
+				available med_available;
+				med_available.id = 20000;
+				med_available.pid = getpid();
+				write(thread_data->npb, &med_available, sizeof(med_available));
+				if (t_info.debugging) { fprintf(stderr,"==sent med_available to npb==\n");}
+
+				thread_data->pidClienteAtender = 0;
+			}
 		}
 		if (!strcasecmp(usr_in, "sair\n")){
-			// ==== Terminate this client ==== //
+			// ==== Terminate this medic ==== //
 			fprintf(stdout, "Exiting...\n");
             suicide Die_Med;
             Die_Med.size = sizeof(Die_Med);
@@ -86,8 +98,8 @@ void * userInput(void * p){
                     fprintf(stderr, "==escreveu a ordem de morte com sucesso para cliente==\n");
                 else
                     perror("erro a escrever a resposta\n");
-                close(npm); // FECHA LOGO O FIFO DO CLIENTE!
-                if (t_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
+                close(npm); // FECHA LOGO O FIFO DO medico!
+                if (t_info.debugging) fprintf(stderr, "==FIFO medico fechado==\n");
             }
 		}
 			
@@ -270,7 +282,7 @@ int main(int argc, char **argv){
             if (res == sizeof(freq_life_sig)-sizeof(freq_life_sig.size)){
 				t_info.waitTime = freq_life_sig.freq; 
 			} else {
-				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+				printf("incomprehensible response: bytes read [%d]\n", res);
 			}
 		}else if(pipeMsgSize == sizeof(suicide)){
 			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
@@ -278,7 +290,7 @@ int main(int argc, char **argv){
             if (res == sizeof(suicide)-sizeof(suicide.size)){
 				terminate();
 			} else {
-				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+				printf("incomprehensible response: bytes read [%d]\n", res);
 			}
 		}else if(pipeMsgSize == sizeof(imDead)){ // msg with info to connect to client
 			imDead ConMed; // <Connect Cli>
@@ -287,7 +299,7 @@ int main(int argc, char **argv){
             if (res == sizeof(ConMed)-sizeof(ConMed.size)){
 				t_info.pidClienteAtender = ConMed.pid;
 			} else {
-				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
+				printf("incomprehensible response: bytes read [%d]\n", res);
 			}
 		}else if(pipeMsgSize == sizeof(msg)){
 			msg msgMed;
@@ -299,6 +311,18 @@ int main(int argc, char **argv){
 					continue; // Ainda não se recebeu nenhuma mensagem com quem deviamos falar
 
 				fprintf(stdout,"%s",msgMed.msg);
+
+				if (!strcasecmp("adeus\n", msgMed.msg)){
+					// ==== Termina a consulta ==== //
+					fprintf(stdout, "Ending Appointment...\n");
+					available med_available;
+					med_available.id = 20000;
+					med_available.pid = getpid();
+					write(t_info.npb, &med_available, sizeof(med_available));
+					if (t_info.debugging) { fprintf(stderr,"==sent med_available to npb==\n");}
+
+					t_info.pidClienteAtender = 0;
+				}
 			/*
 				// ==== Read user input ==== //
 				msg msgToCli;
@@ -330,7 +354,7 @@ int main(int argc, char **argv){
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
 		} else {
-			printf("Not a recognizable msg\n");
+			printf("Not a recognizable msg, pipeMsgSize: %d, sizeof(msg): %d\n", pipeMsgSize, (int)sizeof(msg));
 		}
 	}
 

@@ -7,5 +7,8 @@ cliente:
 medico:
 	gcc ./src/medico.c ./src/utils.c -o ./dist/medico -lm -pthread && ./dist/medico Paulo estomatologia -D
 
-run:
-	./dist/main
+runcliente:
+	./dist/cliente Paulo -D
+
+runmedico:
+	./dist/medico Paulo estomatologia -D
