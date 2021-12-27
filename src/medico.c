@@ -52,16 +52,17 @@ void * userInput(void * p){
 		if (thread_data->pidClienteAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
 			// ======== msg para o medico ======== //
 			msg msgToCli;
-			char cFifoName[50];
-			sprintf(mFifoName, CLIENT_FIFO, t_info.pidClienteAtender);
-			// Opens medic FIFO for write
-			int npc = open(cFifoName, O_WRONLY);
+			msgToCli.size = sizeof(msgToCli);
+			strcpy(msgToCli.msg, usr_in);
+			sprintf(mFifoName, CLIENT_FIFO, thread_data->pidClienteAtender);
+			// Opens client FIFO for write
+			int npc = open(mFifoName, O_WRONLY);
 			if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
 			else{
 				// Send response
 				ret_size = write(npc, &msgToCli, sizeof(msgToCli));
 				if (ret_size == sizeof(msgToCli) && t_info.debugging) // if no error
-					fprintf(stderr, "==success writing freq period to med==\n");
+					fprintf(stderr, "==success writing msg to cli==\n");
 				else
 					perror("erro a escrever a resposta\n");
 				close(npc); // FECHA LOGO O FIFO DO CLIENTE!
@@ -297,7 +298,7 @@ int main(int argc, char **argv){
 				if (t_info.pidClienteAtender == 0)
 					continue; // Ainda não se recebeu nenhuma mensagem com quem deviamos falar
 
-				fprintf(stdout,"%s\n",msgMed.msg);
+				fprintf(stdout,"%s",msgMed.msg);
 			/*
 				// ==== Read user input ==== //
 				msg msgToCli;

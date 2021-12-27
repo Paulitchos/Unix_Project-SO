@@ -1,5 +1,6 @@
 #include "structs.h"
 #include "globals.h"
+#include <stdio.h>
 
 void terminate();
 
@@ -56,16 +57,19 @@ void * userInput(void * p){
 		if (thread_data->pidMedicoAMeAtender!=0){ // tamos a ser atendidos, logo mandamos as nossas mensagens para o medico
 			// ======== msg para o medico ======== //
 			msg msgToMed;
+			msgToMed.size = sizeof(msgToMed);
+			strcpy(msgToMed.msg, usr_in);
 			char mFifoName[50];
-			sprintf(mFifoName, CLIENT_FIFO, g_info.pidMedicoAMeAtender);
+			sprintf(mFifoName, MED_FIFO, thread_data->pidMedicoAMeAtender);
 			// Opens medic FIFO for write
+			fprintf(stderr, "%s | %d\n", mFifoName, thread_data->pidMedicoAMeAtender);
 			int npm = open(mFifoName, O_WRONLY);
 			if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
 			else{
 				// Send response
 				ret_size = write(npm, &msgToMed, sizeof(msgToMed));
 				if (ret_size == sizeof(msgToMed) && g_info.debugging) // if no error
-					fprintf(stderr, "==success writing freq period to med==\n");
+					fprintf(stderr, "==success writing msg to med==\n");
 				else
 					perror("erro a escrever a resposta\n");
 				close(npm); // FECHA LOGO O FIFO DO CLIENTE!
@@ -257,7 +261,7 @@ int main(int argc, char **argv){
 			}
 		}else if(pipeMsgSize == sizeof(imDead)){ // msg with info to connect to medic
 			imDead ConCli;
-			if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDEad(connect to cli)\"==\n");
+			if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"imDEad(connect to med)\"==\n");
             read_res = read(g_info.npc, &(ConCli.size)+1, sizeof(ConCli)-sizeof(ConCli.size));
             if (read_res == sizeof(ConCli)-sizeof(ConCli.size)){
 				g_info.pidMedicoAMeAtender = ConCli.pid;
@@ -273,7 +277,7 @@ int main(int argc, char **argv){
 				if (g_info.pidMedicoAMeAtender == 0)
 					continue; // Ainda não se recebeu nenhuma mensagem com quem deviamos falar
 				
-				fprintf(stdout,"%s\n",msgCli.msg);
+				fprintf(stdout,"%s",msgCli.msg);
 
 				/*
 				// ==== Read user input ==== //

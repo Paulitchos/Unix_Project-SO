@@ -701,38 +701,38 @@ void changeFrqMeds(plista_med p, int freq){
 }
 
 void makeEmTalk(plista_med pm, plista_cli pc){
-    if (g_info.debugging) fprintf(stderr, "==Making Them Talk to each other==\n");
+    if (g_info.debugging) fprintf(stderr, "==Making People Talk to each other==\n");
     if (pm == NULL || pc == NULL) return;
     plista_med pauxm = pm; 
     plista_cli pauxc = pc;
     // Go through clients
     for (int prio = 1; prio <= 3; prio++) {
         do {
+
+            if (! (pauxc->prio!=prio || pauxc->atendido)){
+
+                // Go through medics
+                do{
+                    if (pauxm->disponivel && strcmp(pauxm->esp,pauxc->esp)==0){
+                        // If a match occurs:
+                        if (g_info.debugging) fprintf(stderr, "==Match! med: %d, cli: %d==\n", pauxm->pid_medico, pauxc->pid_cliente);
+                        pauxc->atendido = true;
+                        pauxm->disponivel = false;
+                        char mFifoName[50]; sprintf(mFifoName, MED_FIFO, pauxm->pid_medico);
+                        char cFifoName[50]; sprintf(cFifoName, CLIENT_FIFO, pauxc->pid_cliente);
+                        sendConnect(pauxm->pid_medico, cFifoName);
+                        sendConnect(pauxc->pid_cliente, mFifoName);
+                        break;
+                    }
+
+                    pauxm = pauxm->prox;
+                } while (pauxm != NULL);
+                pauxm = pm;
+
+            }
+
             pauxc = pauxc->prox;
-            if (pauxc->prio!=prio)
-                continue;
-            if (pauxc->atendido)
-                continue;
-            // Go through medics
-            do{
-                pauxm = pauxm->prox;
-                
-                if (pauxm->disponivel && pauxm->esp==pauxc->esp){
-                    // If a match occurs:
-                    if (g_info.debugging) fprintf(stderr, "==Match! med: %d, cli: %d==\n", pauxm->pid_medico, pauxc->pid_cliente);
-                    pauxc->atendido = true;
-                    char mFifoName[50]; sprintf(mFifoName, MED_FIFO, pauxm->pid_medico);
-                    char cFifoName[50]; sprintf(cFifoName, CLIENT_FIFO, pauxc->pid_cliente);
-                    sendConnect(pauxc->pid_cliente, cFifoName);
-                    sendConnect(pauxm->pid_medico, mFifoName);
-                    break;
-                }
-
-                
-            } while (pauxm->prox != NULL);
-            pauxm = pm;
-
-        } while (pauxc->prox != NULL);
+        } while (pauxc != NULL);
         pauxc = pc;
     }
 }
