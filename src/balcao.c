@@ -643,21 +643,22 @@ void listaespera(plista_cli p){
         do {
             if (pauxc->atendido == false){
                 if(esp == 1 && strcmp(pauxc->esp,"geral")==0){
-                    printf("========== Geral ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                    printf("========== Geral ==========\n");printf("%d\t%s\t%d\n",pauxc->pid_cliente,pauxc->nome,pauxc->prio);
                 } else if(esp == 2 && strcmp(pauxc->esp,"estomatologia")==0){
-                    printf("========== Estomatologia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                    printf("========== Estomatologia ==========\n");printf("%d\t%s\t%d\n",pauxc->pid_cliente,pauxc->nome,pauxc->prio);
                 } else if(esp == 3 && strcmp(pauxc->esp,"neurologia")==0){
-                    printf("========== Neurologia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                    printf("========== Neurologia ==========\n");printf("%d\t%s\t%d\n",pauxc->pid_cliente,pauxc->nome,pauxc->prio);
                 } else if(esp == 4 && strcmp(pauxc->esp,"ortopedia")==0){
-                    printf("========== Ortopedia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);
+                    printf("========== Ortopedia ==========\n");printf("%d\t%s\t%d\n",pauxc->pid_cliente,pauxc->nome,pauxc->prio);
                 } else if(esp == 5 && strcmp(pauxc->esp,"oftalmologia")==0){
-                    printf("========== Oftalmologia ==========\n");printf("%d\t%s\t%d",p->pid_cliente,p->nome,p->prio);}
+                    printf("========== Oftalmologia ==========\n");printf("%d\t%s\t%d\n",pauxc->pid_cliente,pauxc->nome,pauxc->prio);}
             }
             pauxc = pauxc->prox;
         } while (pauxc != NULL);
         pauxc = p;
-    }           
-     p = p->prox;
+        
+    }   
+    p = p->prox;          
 }
 
 plista_med cleanDeadMed(plista_med p, pid_t med_pid){
