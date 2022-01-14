@@ -30,6 +30,7 @@ typedef struct listamedicos lista_med, *plista_med;
     char esp[20];
     bool disponivel; // perguntar se pode utilizar
     plista_med prox;
+    int waitingForSignal;
 };
 
 plista_cli insert_end(plista_cli p, plista_cli novo_cli);
@@ -86,8 +87,8 @@ void * waitingline(void * p){
 	pthrds waitingline = (thrds *) p;
     do {
         sleep(*waitingline->waitingdisplay);
+        fprintf(stdout,"==== Display da lista de espera: ====\n");
         listaespera(*waitingline->cli_list);
-		if (g_info.debugging) { fprintf(stderr,"==display da lista de espera==\n");}
     }while (!waitingline->t_die);
     pthread_exit(NULL); // you can return something like a struct, (careful not to return a local variable)
 }
@@ -447,7 +448,7 @@ int main(int argc, char **argv,  char *envp[]){
                     } else {
                         // =========== Save in Linked List =========== //
                         novo_med = malloc(sizeof(*novo_med));
-                        if (novo_med==NULL) { fprintf(stderr,"==Malloc Error on new Client==\n"); terminate(); }
+                        if (novo_med==NULL) { fprintf(stderr,"==Malloc Error on new medic==\n"); terminate(); }
                         novo_med->pid_medico = esp_fmed.pid_medico;
                         strcpy(novo_med->nome, esp_fmed.nome);
                         strcpy(novo_med->esp, esp_fmed.esp);
