@@ -53,6 +53,9 @@ void sendConnect(pid_t pid, char * FifoName);
 void sendConnectToCli(pid_t pidCli);
 int makeMedAvailable(plista_med, pid_t);
 void listaespera(plista_cli p);
+void incMedsTime(plista_med p);
+bool resetTimer(pid_t pid_med, plista_med p);
+plista_med checkAndREmoveOverdueMeds(plista_med p);
 
 typedef struct thread_global_info{
 	bool debugging;
@@ -81,16 +84,57 @@ typedef struct help{
 // declared globally to terminate thread when ^C recieved
 // static so it can't be accessed by other source files
 static global_info g_info; // <Global_Info>
-pthread_t tid[2]; // <ThreadID>
+pthread_t tid[3]; // <ThreadID>
 
 void * waitingline(void * p){
 	pthrds waitingline = (thrds *) p;
+    bool t_die = 0;
+    int sleep_var = 20;
     do {
-        sleep(*waitingline->waitingdisplay);
+        t_die = 0;
+        sleep_var = *waitingline->waitingdisplay;
+
+        pthread_mutex_lock(waitingline->pMutAll);
+        sleep(sleep_var);
+        pthread_mutex_unlock(waitingline->pMutAll);
+
         fprintf(stdout,"==== Display da lista de espera: ====\n");
+        pthread_mutex_lock(waitingline->pMutAll);
         listaespera(*waitingline->cli_list);
-    }while (!waitingline->t_die);
+        pthread_mutex_unlock(waitingline->pMutAll);
+
+        pthread_mutex_lock(waitingline->pMutAll);
+        t_die = waitingline->t_die;
+        pthread_mutex_unlock(waitingline->pMutAll);
+    }while (!t_die);
     pthread_exit(NULL); // you can return something like a struct, (careful not to return a local variable)
+}
+
+void * medsTimer(void * p){
+    pthrds thread_data = (thrds *) p;
+    bool t_die = 0;
+    int sleep_var = 20;
+    do {
+        t_die = 0;
+        sleep_var = *thread_data->waitingdisplay;
+
+        sleep(1);
+
+        // Checking and removing dead meds;
+        //pthread_mutex_lock(thread_data->pMutAll);
+        *thread_data->med_list = checkAndREmoveOverdueMeds(*thread_data->med_list);
+        pthread_mutex_unlock(thread_data->pMutAll);
+
+        // Incrementing medics timer
+        pthread_mutex_lock(thread_data->pMutAll);
+        incMedsTime(*thread_data->med_list);
+        pthread_mutex_unlock(thread_data->pMutAll);
+
+        pthread_mutex_lock(thread_data->pMutAll);
+        t_die = thread_data->t_die;
+        pthread_mutex_unlock(thread_data->pMutAll);
+    }while (!t_die);
+    pthread_exit(NULL);
 }
 
 void * adminCommands(void * p){
@@ -174,6 +218,7 @@ void terminate(){
 		if (g_info.debugging) fprintf(stderr, "==[Main Thread] Sending SIGINT to User Input Thread==\n");
     	pthread_kill(tid[0], SIGINT); // maybe this? Mayyyyyybe
         pthread_kill(tid[1], SIGINT);
+        pthread_kill(tid[2], SIGINT);
         //pthread_kill(g_info.tid, SIGINT);
 		// ===== ================= ===== //
 
@@ -323,7 +368,7 @@ int main(int argc, char **argv,  char *envp[]){
         if (g_info.debugging) fprintf(stderr, "==FIFO aberto para READ (+WRITE) BLOQUEANTE==\n");        
         
 
-        thrds td[2];
+        thrds td[3];
         lista_cli ** ppnovo_cli = &g_info.cli_list;
         lista_med ** ppnovo_med = &g_info.med_list;
         int waitingdisplay = 30;
@@ -348,6 +393,19 @@ int main(int argc, char **argv,  char *envp[]){
         
         // ================ ============ ================ //
 
+        // ================ waiting line ================ //
+        td[2].t_die = 0;
+        td[2].waitingdisplay = pwaitingdisplay;
+        td[2].pMutAll = &MutAll;
+        td[2].cli_list = ppnovo_cli;
+        td[2].med_list = ppnovo_med;
+
+        //tid[1] = td[1].tid;
+        if (g_info.debugging) fprintf(stderr,"==Created medsTimer Thread\n");
+        pthread_create(&tid[2], NULL, medsTimer, &td[2]);
+        
+        // ================ ============ ================ //
+
         // ================ User Input ================ //
         td[0].t_die = false;
         td[0].waitingdisplay = pwaitingdisplay;
@@ -359,7 +417,7 @@ int main(int argc, char **argv,  char *envp[]){
         pthread_create(&tid[0], NULL, adminCommands, &td[0]);
         
         // ================ ========== ================ //
-        if (g_info.debugging) fprintf(stderr, "==Threads created==\n==Thread IDs: %lu %lu %lu==\n",tid[0], tid[1], pthread_self());
+        if (g_info.debugging) fprintf(stderr, "==Threads created==\n==Thread IDs: %lu %lu %lu %lu==\n",tid[0], tid[1], tid[2], pthread_self());
 
         do{
             // Recieve simptoms from cliente
@@ -444,6 +502,7 @@ int main(int argc, char **argv,  char *envp[]){
                     if (g_info.debugging) fprintf(stderr, "==nome medico: %s | especialidade: %s==\n",esp_fmed.nome, esp_fmed.esp);
                     
                     if(medExists(esp_fmed.pid_medico,g_info.med_list)){
+                        resetTimer(esp_fmed.pid_medico,g_info.med_list);
                         printf("LIFE SIGNAL -> %s %s %d\n", esp_fmed.nome, esp_fmed.esp, esp_fmed.pid_medico);
                     } else {
                         // =========== Save in Linked List =========== //
@@ -453,6 +512,7 @@ int main(int argc, char **argv,  char *envp[]){
                         strcpy(novo_med->nome, esp_fmed.nome);
                         strcpy(novo_med->esp, esp_fmed.esp);
                         novo_med->disponivel = 1;
+                        novo_med->waitingForSignal=0;
                         novo_med->prox = NULL;
                         g_info.med_list = insert_end_med(g_info.med_list, novo_med);
                         if (g_info.debugging) fprintf(stderr, "==Added New med to Linked List, showing info:==\n");
@@ -555,6 +615,39 @@ bool medExists(pid_t pid_med, plista_med p){
     return false;
 }
 
+bool resetTimer(pid_t pid_med, plista_med p){
+    if (p == NULL) return false;
+    do {
+        if ( p->pid_medico == pid_med)
+            p->waitingForSignal=0;
+        p = p->prox;
+    } while (p != NULL);
+    return true;
+}
+
+void incMedsTime(plista_med p){
+    if (p == NULL) return;
+    do {
+        p->waitingForSignal ++;
+        if (g_info.debugging) fprintf(stderr,"==Inc med %d: %d==\n", p->pid_medico, p->waitingForSignal);
+        p = p->prox;
+    } while (p != NULL);
+}
+
+plista_med checkAndREmoveOverdueMeds(plista_med p){
+    //if (g_info.debugging) fprintf(stderr,"==checkAndREmoveOverdueMeds==\n");
+    if (p == NULL) return p;
+    plista_med paux = p;
+    do {
+        //if (g_info.debugging) fprintf(stderr,"== med: %d, time: %d==\n", p->pid_medico, p->waitingForSignal);
+        if (p->waitingForSignal > 21) {
+            if (g_info.debugging) fprintf(stderr,"==No Life signal recieved from med %d, cleaning...==\n", p->pid_medico);
+            paux = cleanDeadMed(paux, p->pid_medico);            
+        }
+        p = p->prox;
+    } while (p != NULL);
+    return paux;
+}
 
 plista_cli insert_end(plista_cli p, plista_cli novo_cli){
     plista_cli aux = NULL; 
@@ -673,7 +766,7 @@ plista_med cleanDeadMed(plista_med p, pid_t med_pid){
         curr = curr->prox;
     }
 
-    if(curr == NULL){       // Livro nao existe
+    if(curr == NULL){
         fprintf(stderr, "Medico Não encontrado\n");
         return p;
     }
