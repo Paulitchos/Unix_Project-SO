@@ -390,7 +390,6 @@ int main(int argc, char **argv,  char *envp[]){
 
         //tid[1] = td[1].tid;
         pthread_create(&tid[1], NULL, waitingline, &td[1]);
-        
         // ================ ============ ================ //
 
         // ================ waiting line ================ //
@@ -403,7 +402,6 @@ int main(int argc, char **argv,  char *envp[]){
         //tid[1] = td[1].tid;
         if (g_info.debugging) fprintf(stderr,"==Created medsTimer Thread\n");
         pthread_create(&tid[2], NULL, medsTimer, &td[2]);
-        
         // ================ ============ ================ //
 
         // ================ User Input ================ //
@@ -415,8 +413,8 @@ int main(int argc, char **argv,  char *envp[]){
 
         //tid[0] = td[0].tid;
         pthread_create(&tid[0], NULL, adminCommands, &td[0]);
-        
         // ================ ========== ================ //
+        
         if (g_info.debugging) fprintf(stderr, "==Threads created==\n==Thread IDs: %lu %lu %lu %lu==\n",tid[0], tid[1], tid[2], pthread_self());
 
         do{
@@ -428,6 +426,12 @@ int main(int argc, char **argv,  char *envp[]){
                 sint_fcli.size = sizeof(sint_fcli);
                 res = read(g_info.npb, &(sint_fcli.size)+1, (int)sizeof(sint_fcli)-sizeof(sint_fcli.size));
                 if (res == (int)sizeof(sint_fcli)-sizeof(sint_fcli.size)) {
+
+                    // count number of clis in linked list
+                    //if (cliInQueue() >= maxclientes){
+                        // open this client's fifo and send a struct to tell him it's full and to go away
+                    //    continue;
+                    //}
 
                     // ============== Communicate with Classificador (2) ============== //
                     sint_fcli.sintomas[strlen(sint_fcli.sintomas)-1] = '\n';
@@ -639,7 +643,7 @@ plista_med checkAndREmoveOverdueMeds(plista_med p){
     if (p == NULL) return p;
     plista_med paux = p;
     do {
-        //if (g_info.debugging) fprintf(stderr,"== med: %d, time: %d==\n", p->pid_medico, p->waitingForSignal);
+        if (g_info.debugging) fprintf(stderr,"== med: %d, time: %d==\n", p->pid_medico, p->waitingForSignal);
         if (p->waitingForSignal > 21) {
             if (g_info.debugging) fprintf(stderr,"==No Life signal recieved from med %d, cleaning...==\n", p->pid_medico);
             paux = cleanDeadMed(paux, p->pid_medico);            
