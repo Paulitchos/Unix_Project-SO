@@ -180,8 +180,6 @@ void * adminCommands(void * p){
                 res = write(npb, &Die_Blc, sizeof(Die_Blc));
                 if (res == sizeof(Die_Blc) && g_info.debugging) // if no error
                     fprintf(stderr, "==escreveu a ordem de morte com sucesso para BALCAO==\n");
-                else
-                    perror("erro a escrever a resposta\n");
                 close(npb); // FECHA LOGO O FIFO DO CLIENTE!
                 if (g_info.debugging) fprintf(stderr, "==FIFO cliente fechado==\n");
             }
