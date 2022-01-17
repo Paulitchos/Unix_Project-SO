@@ -1,19 +1,19 @@
 all:
-	@gcc ./src/balcao.c ./src/utils.c -o ./dist/balcao  -lm -pthread
-	@gcc ./src/cliente.c ./src/utils.c -o ./dist/cliente -lm -pthread
-	@gcc ./src/medico.c ./src/utils.c -o ./dist/medico -lm -pthread
+	@gcc ./src/balcao.c ./src/utils.c -o ./dist/balcao  -lm -pthread -w
+	@gcc ./src/cliente.c ./src/utils.c -o ./dist/cliente -lm -pthread -w
+	@gcc ./src/medico.c ./src/utils.c -o ./dist/medico -lm -pthread -w
 
 balcao:
-	@gcc ./src/balcao.c ./src/utils.c -o ./dist/balcao  -lm -pthread
+	@gcc ./src/balcao.c ./src/utils.c -o ./dist/balcao  -lm -pthread -w
 
 cliente:
-	@gcc ./src/cliente.c ./src/utils.c -o ./dist/cliente -lm -pthread
+	@gcc ./src/cliente.c ./src/utils.c -o ./dist/cliente -lm -pthread -w
 
 medico:
-	@gcc ./src/medico.c ./src/utils.c -o ./dist/medico -lm -pthread
+	@gcc ./src/medico.c ./src/utils.c -o ./dist/medico -lm -pthread -w
 
 clean:
-	rm ./dist/*
+	@rm ./dist/*
 
 runbalcaoD:
 	gcc ./src/balcao.c ./src/utils.c -o ./dist/balcao  -lm -pthread && ./dist/balcao -D # -Wall -Werror -Wextra

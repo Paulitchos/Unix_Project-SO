@@ -8,7 +8,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define WAITINGLINESIZE 5
+#define WAITINGLINESIZE 5 // for each specialty
 
 // Run balcao:
 /*
