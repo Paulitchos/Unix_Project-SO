@@ -26,13 +26,21 @@ static thread_info t_info; // static so it can't be accessed by other source fil
 void * sinalDeVida(void * p){
 	pthread_info sinal_vida = (thread_info *) p;
 	sinal_vida->waitTime = 20;
+	bool goDie;
+	int goWait;
     do {
 		pthread_mutex_lock(sinal_vida->pMutAll);
-        sleep(sinal_vida->waitTime);
+		goWait = sinal_vida->waitTime;
+		pthread_mutex_unlock(sinal_vida->pMutAll);
+		
+        sleep(goWait);
+
+		pthread_mutex_lock(sinal_vida->pMutAll);
         write(sinal_vida->npb, sinal_vida->pmed_toblc, sizeof(*sinal_vida->pmed_toblc));
 		if (sinal_vida->debugging) { fprintf(stderr,"==sent med_toblc to npb==\n");}
+		goDie = sinal_vida->t_die;
 		pthread_mutex_unlock(sinal_vida->pMutAll);
-    }while (!sinal_vida->t_die);
+    }while (!goDie);
     pthread_exit(NULL); // you can return something like a struct, (careful not to return a local variable)
 }
 
@@ -40,12 +48,14 @@ void * sinalDeVida(void * p){
 void * userInput(void * p){
 	pthread_info thread_data = (thread_info *) p;
 	int ret_size;
+	bool goDie;
 	char usr_in[TAM_MAX_MSG];
 	char mFifoName[50];
 	if (thread_data->debugging) { fprintf(stderr,"==User input Thread running==\n");}
     do {
 		//pthread_mutex_lock(thread_data->pMutAll);
 		ret_size = read(STDIN_FILENO,&usr_in,sizeof(usr_in));
+		pthread_mutex_lock(thread_data->pMutAll);
 		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
 		usr_in[ret_size] = '\0';
 		usr_in[strlen(usr_in)-1] = '\n';
@@ -85,7 +95,7 @@ void * userInput(void * p){
 			// ==== Terminate this medic ==== //
 			fprintf(stdout, "Exiting...\n");
             suicide Die_Med;
-            Die_Med.size = sizeof(Die_Med);
+            Die_Med.size = 20001;
             // Opens medic FIFO for write
 			sprintf(mFifoName, MED_FIFO, getpid());
             int npm = open(mFifoName, O_WRONLY);
@@ -103,7 +113,9 @@ void * userInput(void * p){
             }
 		}
 			
-	}while (!thread_data->t_die);
+	goDie = thread_data->t_die;
+	pthread_mutex_unlock(thread_data->pMutAll);
+	}while (!goDie);
     pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
 }
 
@@ -171,7 +183,7 @@ int main(int argc, char **argv){
 	freq_tmed freq_life_sig;
 	freq_life_sig.size = sizeof(freq_life_sig);
 	suicide suicide;
-	suicide.size = sizeof(suicide);
+	suicide.size = 20001;
 	t_info.pidClienteAtender= 0;
 	char cFifoName[50];
 	int npc;
@@ -266,6 +278,7 @@ int main(int argc, char **argv){
 
 		// Recieves message
 		ret_size = read(npm, &pipeMsgSize, sizeof(pipeMsgSize));
+		pthread_mutex_lock(&MutAll);
 		if (pipeMsgSize == sizeof(connectCli_fblc)){
 			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"connectCli_fblc\"==\n");
 			if(t_info.debugging) printf("==Endereços: &connectCli_fblc: %p | old(&(connectCli_fblc.nome)): %p | (&(connectCli_fblc.size)+1): %p==\n",&connectCli_fblc, &(connectCli_fblc.nome), &(connectCli_fblc.size)+1);
@@ -284,10 +297,11 @@ int main(int argc, char **argv){
 			} else {
 				printf("incomprehensible response: bytes read [%d]\n", res);
 			}
-		}else if(pipeMsgSize == sizeof(suicide)){
+		}else if(pipeMsgSize == 20001){ //struct suicide ID
 			if(t_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
             res = read(npm, &(suicide.size)+1, sizeof(suicide)-sizeof(suicide.size));
             if (res == sizeof(suicide)-sizeof(suicide.size)){
+				if (suicide.info == true) printf("fila de medicos cheia, pode descansar\n");
 				terminate();
 			} else {
 				printf("incomprehensible response: bytes read [%d]\n", res);
@@ -323,39 +337,13 @@ int main(int argc, char **argv){
 
 					t_info.pidClienteAtender = 0;
 				}
-			/*
-				// ==== Read user input ==== //
-				msg msgToCli;
-				msgToCli.size = sizeof(msgToCli);
-				ret_size = read(STDIN_FILENO,&msgToCli.msg,sizeof(msgToCli.msg));
-				if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
-				msgToCli.msg[ret_size] = '\0';
-				msgToCli.msg[strlen(msgToCli.msg)-1] = '\n';
-				if (t_info.debugging) {fprintf(stderr, "==read: |"); debugString(msgToCli.msg); fprintf(stderr, "|==\n"); }
-				// ==== =============== ==== //
-
-				// ======== msg para o cliente ======== //
-				sprintf(cFifoName, CLIENT_FIFO, t_info.pidClienteAtender);
-				// Opens client FIFO for write
-				npc = open(mFifoName, O_WRONLY);
-				if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
-				else{
-					// Send response
-					res = write(npc, &msgToCli, sizeof(msgToCli));
-					if (res == sizeof(msgToCli) && t_info.debugging) // if no error
-						fprintf(stderr, "==success writing freq period to cli==\n");
-					else
-						perror("erro a escrever a resposta\n");
-					close(npc); // FECHA LOGO O FIFO DO CLIENTE!
-				}
-				// ======== ================== ======== //
-			*/
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", res);
 			}
 		} else {
 			printf("Not a recognizable msg, pipeMsgSize: %d, sizeof(msg): %d\n", pipeMsgSize, (int)sizeof(msg));
 		}
+		pthread_mutex_unlock(&MutAll);
 	}
 
 	close(npm);

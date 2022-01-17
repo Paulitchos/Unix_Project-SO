@@ -23,6 +23,7 @@ static global_info g_info; // <Global_Info>
 
 // Thread #1
 void * userInput(void * p){
+	bool maman_die;
 	pglobal_info thread_data = (global_info *) p;
 	int ret_size;
 	char usr_in[TAM_MAX_MSG];
@@ -30,6 +31,7 @@ void * userInput(void * p){
     do {
 		//pthread_mutex_lock(thread_data->pMutAll);
 		ret_size = read(STDIN_FILENO,&usr_in,sizeof(usr_in));
+		pthread_mutex_lock(g_info.pMutAll);
 		if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
 		usr_in[ret_size] = '\0';
 		usr_in[strlen(usr_in)-1] = '\n';
@@ -62,7 +64,7 @@ void * userInput(void * p){
 			// ==== Terminate this client ==== //
 			fprintf(stdout, "Exiting...\n");
             suicide Die_Cli;
-            Die_Cli.size = sizeof(Die_Cli);
+            Die_Cli.size = 20001;
             // Opens clients FIFO for write
             int npc = open(thread_data->cFifoName, O_WRONLY);
             if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
@@ -79,7 +81,9 @@ void * userInput(void * p){
             }
 		}
 			
-	}while (!thread_data->t_die);
+	maman_die = thread_data->t_die;
+	pthread_mutex_unlock(g_info.pMutAll);
+	}while (!maman_die);
     pthread_exit(NULL); //podes devolver algo como uma estrutura (tem cuidade para não retornares uma variavel local)
 }
 
@@ -238,6 +242,7 @@ int main(int argc, char **argv){
 	while (1){
 		// Recieves message
 		if (read(g_info.npc, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { printf("Error Reading, output: %d\n",ret_size); exceptionOcurred(); }
+		pthread_mutex_lock(&MutAll);
 		if (pipeMsgSize == sizeof(info_fblc)){
 			if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"info_fblc\"==\n");
 			if(g_info.debugging) fprintf(stderr,"==sizeof(info_fblc) %d | sizeof(info_fblc)-sizeof(info_fblc.esp) %d==\n", (int)sizeof(info_fblc), (int)(sizeof(info_fblc)-sizeof(info_fblc.esp)));
@@ -252,11 +257,12 @@ int main(int argc, char **argv){
 				printf("Num medicos on-line -> %d\n",info_fblc.num_espOnline);
 			} else
 				printf("incomprehensible response: bytes read [%d]\n", read_res);
-		}else if(pipeMsgSize == sizeof(suicide)){
+		}else if(pipeMsgSize == 20001){ // struct suicide ID
 			if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
 			suicide suicide;
 			read_res = read(g_info.npc, &(suicide.size)+1, sizeof(suicide)-sizeof(suicide.size));
 			if (read_res == sizeof(suicide)-sizeof(suicide.size)){
+				if (suicide.info == true) printf("fila de espera cheia, volte mais tarde\n");
 				terminate();
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", read_res);
@@ -288,40 +294,13 @@ int main(int argc, char **argv){
 					g_info.pidMedicoAMeAtender = 1;
 				}
 
-				/*
-				// ==== Read user input ==== //
-				msg msgToMed;
-				msgToMed.size = sizeof(msgToMed);
-				ret_size = read(STDIN_FILENO,&msgToMed.msg,sizeof(msgToMed.msg));
-				if (ret_size <= -1 ) { printf("Error Reading, output: %d\n",ret_size); terminate(); }
-				msgToMed.msg[ret_size] = '\0';
-				msgToMed.msg[strlen(msgToMed.msg)-1] = '\n';
-				if (g_info.debugging) {fprintf(stderr, "==read: |"); debugString(msgToMed.msg); fprintf(stderr, "|==\n"); }
-				// ==== =============== ==== //
-
-				// ======== msg para o medico ======== //
-				sprintf(mFifoName, CLIENT_FIFO, g_info.pidMedicoAMeAtender);
-				// Opens medic FIFO for write
-				npm = open(mFifoName, O_WRONLY);
-				if (npm == -1) perror("Erro no open - Ninguém quis a resposta\n");
-				else{
-					// Send response
-					ret_size = write(npm, &msgToMed, sizeof(msgToMed));
-					if (ret_size == sizeof(msgToMed) && g_info.debugging) // if no error
-						fprintf(stderr, "==success writing freq period to cli==\n");
-					else
-						perror("erro a escrever a resposta\n");
-					close(npm); // FECHA LOGO O FIFO DO CLIENTE!
-				}
-				// ======== ================== ======== //
-				*/
-
 			} else {
 				printf("Sem resposta ou resposta incompreensível [bytes lidos: %d]\n", ret_size);
 			}
 		} else {
 			printf("Not a recognizable msg, pipeMsgSize: %d, sizeof(msg): %d\n", pipeMsgSize, (int)sizeof(msg));
 		}
+		pthread_mutex_unlock(&MutAll);
 	}
 
 	close(g_info.npc);

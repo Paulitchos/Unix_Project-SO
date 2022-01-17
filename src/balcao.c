@@ -1,10 +1,14 @@
 #include "structs.h"
 #include "globals.h"
+#include <bits/pthreadtypes.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#define WAITINGLINESIZE 5
 
 // Run balcao:
 /*
@@ -55,7 +59,9 @@ int makeMedAvailable(plista_med, pid_t);
 void listaespera(plista_cli p);
 void incMedsTime(plista_med p);
 bool resetTimer(pid_t pid_med, plista_med p);
-plista_med checkAndREmoveOverdueMeds(plista_med p);
+int numPeopleOfThisEsp(char * s,plista_cli p);
+int numClis(plista_cli p);
+int numMeds(plista_med p);
 
 typedef struct thread_global_info{
 	bool debugging;
@@ -86,24 +92,24 @@ typedef struct help{
 static global_info g_info; // <Global_Info>
 pthread_t tid[3]; // <ThreadID>
 
+plista_med checkAndREmoveOverdueMeds(plista_med p, pthrds p_thrd);
+
 void * waitingline(void * p){
 	pthrds waitingline = (thrds *) p;
     bool t_die = 0;
     int sleep_var = 20;
     do {
         t_die = 0;
-        sleep_var = *waitingline->waitingdisplay;
-
         pthread_mutex_lock(waitingline->pMutAll);
-        sleep(sleep_var);
+        sleep_var = *waitingline->waitingdisplay;
         pthread_mutex_unlock(waitingline->pMutAll);
+
+        sleep(sleep_var);
 
         fprintf(stdout,"==== Display da lista de espera: ====\n");
         pthread_mutex_lock(waitingline->pMutAll);
         listaespera(*waitingline->cli_list);
-        pthread_mutex_unlock(waitingline->pMutAll);
 
-        pthread_mutex_lock(waitingline->pMutAll);
         t_die = waitingline->t_die;
         pthread_mutex_unlock(waitingline->pMutAll);
     }while (!t_die);
@@ -116,21 +122,16 @@ void * medsTimer(void * p){
     int sleep_var = 20;
     do {
         t_die = 0;
-        sleep_var = *thread_data->waitingdisplay;
 
         sleep(1);
 
         // Checking and removing dead meds;
-        //pthread_mutex_lock(thread_data->pMutAll);
-        *thread_data->med_list = checkAndREmoveOverdueMeds(*thread_data->med_list);
-        pthread_mutex_unlock(thread_data->pMutAll);
+        pthread_mutex_lock(thread_data->pMutAll);
+        *thread_data->med_list = checkAndREmoveOverdueMeds(*thread_data->med_list, thread_data);
 
         // Incrementing medics timer
-        pthread_mutex_lock(thread_data->pMutAll);
         incMedsTime(*thread_data->med_list);
-        pthread_mutex_unlock(thread_data->pMutAll);
 
-        pthread_mutex_lock(thread_data->pMutAll);
         t_die = thread_data->t_die;
         pthread_mutex_unlock(thread_data->pMutAll);
     }while (!t_die);
@@ -168,7 +169,8 @@ void * adminCommands(void * p){
         } else if (strcasecmp(usr_in,"ENCERRA\n")==0) {
             fprintf(stdout, "Exiting...\n");
             suicide Die_Blc;
-            Die_Blc.size = sizeof(Die_Blc);
+            Die_Blc.size = 20001;
+            Die_Blc.info = false; 
             // Opens balcao FIFO for write
             int npb = open(BALCAO_FIFO, O_WRONLY);
             if (npb == -1) perror("Erro no open - Ninguém quis a resposta\n");
@@ -225,6 +227,7 @@ void terminate(){
 		// ==== Tell Everyone to die ==== //
         tellClisToDie(g_info.cli_list);
         tellMedsToDie(g_info.med_list);
+
 		// ==== ==================== ==== //
 
 		// ===== Close Pipes ===== // //?only need to close them once?
@@ -392,7 +395,7 @@ int main(int argc, char **argv,  char *envp[]){
         pthread_create(&tid[1], NULL, waitingline, &td[1]);
         // ================ ============ ================ //
 
-        // ================ waiting line ================ //
+        // ================ meds timer ================ //
         td[2].t_die = 0;
         td[2].waitingdisplay = pwaitingdisplay;
         td[2].pMutAll = &MutAll;
@@ -420,7 +423,9 @@ int main(int argc, char **argv,  char *envp[]){
         do{
             // Recieve simptoms from cliente
             if (read(g_info.npb, &pipeMsgSize, sizeof(pipeMsgSize)) <= -1 ) { 
-                printf("Error Reading, output\n"); trata_SIGINT(0); }
+                printf("Error Reading, output\n"); trata_SIGINT(0); 
+            }
+            pthread_mutex_lock(&MutAll);
             if (pipeMsgSize == sizeof(sint_fcli)){
                 if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"sint_fcli\"==\n");
                 sint_fcli.size = sizeof(sint_fcli);
@@ -456,6 +461,34 @@ int main(int argc, char **argv,  char *envp[]){
                     sscanf(msgClassificador,"%s %d",info_tcli.esp,&info_tcli.prio);
                     if (g_info.debugging) { fprintf(stderr, "==Especialidade -> %s | Prioridade -> %d==\n",info_tcli.esp, info_tcli.prio); }
                     // =========== ====================================== ===========
+
+                    int num_peeps = numPeopleOfThisEsp(info_tcli.esp, g_info.cli_list);
+                    if (g_info.debugging) fprintf(stderr, "==num people of this esp: %d==\n", num_peeps);
+                    if (num_peeps >= WAITINGLINESIZE || numClis( g_info.cli_list ) >= maxclientes) {
+                        // send die
+                        suicide Die_Clis;
+                        Die_Clis.info = true;
+                        Die_Clis.size=20001;
+                        char cFifoName[50];
+                        int res;
+                        int npc;
+                        if (g_info.debugging) fprintf(stderr, "==Line Full, sending kill order to cli==\n");
+                        sprintf(cFifoName, CLIENT_FIFO, sint_fcli.pid_cliente);
+
+                        // Opens clients FIFO for write
+                        npc = open(cFifoName, O_WRONLY);
+                        if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
+                        else{
+                            // Send response
+                            res = write(npc, &Die_Clis, sizeof(Die_Clis));
+                            if (res == sizeof(Die_Clis) && g_info.debugging) // if no error
+                                fprintf(stderr, "==success writing kill order to cli of PID: %d==\n",sint_fcli.pid_cliente);
+                            else
+                                perror("erro a escrever a resposta\n");
+                            close(npc); // FECHA LOGO O FIFO DO CLIENTE!
+                        }
+                        continue;
+                    }
 
                     // =========== Save in Linked List =========== //
                     novo_cli = malloc(sizeof(*novo_cli));
@@ -509,6 +542,34 @@ int main(int argc, char **argv,  char *envp[]){
                         resetTimer(esp_fmed.pid_medico,g_info.med_list);
                         printf("LIFE SIGNAL -> %s %s %d\n", esp_fmed.nome, esp_fmed.esp, esp_fmed.pid_medico);
                     } else {
+
+                        // check if meds exceed maxmeds
+                        if (numMeds( g_info.med_list ) >= maxmedicos) {
+                            // send die
+                            suicide Die_Med;
+                            Die_Med.info = true;
+                            Die_Med.size=20001;
+                            char cFifoName[50];
+                            int res;
+                            int npc;
+                            if (g_info.debugging) fprintf(stderr, "==Line Full, sending kill order to med==\n");
+                            sprintf(cFifoName, MED_FIFO, esp_fmed.pid_medico);
+
+                            // Opens med FIFO for write
+                            npc = open(cFifoName, O_WRONLY);
+                            if (npc == -1) perror("Erro no open - Ninguém quis a resposta\n");
+                            else{
+                                // Send response
+                                res = write(npc, &Die_Med, sizeof(Die_Med));
+                                if (res == sizeof(Die_Med) && g_info.debugging) // if no error
+                                    fprintf(stderr, "==success writing kill order to cli of PID: %d==\n",esp_fmed.pid_medico);
+                                else
+                                    perror("erro a escrever a resposta\n");
+                                close(npc); // FECHA LOGO O FIFO DO CLIENTE!
+                            }
+                            continue;
+                        }
+
                         // =========== Save in Linked List =========== //
                         novo_med = malloc(sizeof(*novo_med));
                         if (novo_med==NULL) { fprintf(stderr,"==Malloc Error on new medic==\n"); terminate(); }
@@ -543,7 +604,7 @@ int main(int argc, char **argv,  char *envp[]){
                 } else {
                     printf("incomprehensible response: bytes read [%d]\n", res);
                 }
-            } else if (pipeMsgSize == sizeof(suicide)) {
+            } else if (pipeMsgSize == 20001) { // struct suicide ID
                 if(g_info.debugging) fprintf(stderr,"==Recieved Msg Type \"suicide\"==\n");
                 suicide goodbye;
                 res = read(g_info.npb, &(goodbye.size)+1, sizeof(goodbye)-sizeof(goodbye.size));
@@ -569,6 +630,7 @@ int main(int argc, char **argv,  char *envp[]){
                 fprintf(stderr,"No recognizable message recieved from pipe, aborting\n");
                 terminate();
             }
+            pthread_mutex_unlock(&MutAll);
         } while (true);    
 
         return 4;
@@ -619,6 +681,37 @@ bool medExists(pid_t pid_med, plista_med p){
     return false;
 }
 
+int numPeopleOfThisEsp(char * s, plista_cli p){
+    if (p == NULL) return 0;
+    int count=0;
+    do {
+        if ( strcmp(p->esp, s) == 0)
+            count ++;
+        p = p->prox;
+    } while (p != NULL);
+    return count;
+}
+
+int numClis(plista_cli p){
+    if (p == NULL) return 0;
+    int count=0;
+    do {
+        count ++;
+        p = p->prox;
+    } while (p != NULL);
+    return count;
+}
+
+int numMeds(plista_med p){
+    if (p == NULL) return 0;
+    int count=0;
+    do {
+        count ++;
+        p = p->prox;
+    } while (p != NULL);
+    return count;
+}
+
 bool resetTimer(pid_t pid_med, plista_med p){
     if (p == NULL) return false;
     do {
@@ -633,17 +726,15 @@ void incMedsTime(plista_med p){
     if (p == NULL) return;
     do {
         p->waitingForSignal ++;
-        if (g_info.debugging) fprintf(stderr,"==Inc med %d: %d==\n", p->pid_medico, p->waitingForSignal);
         p = p->prox;
     } while (p != NULL);
 }
 
-plista_med checkAndREmoveOverdueMeds(plista_med p){
-    //if (g_info.debugging) fprintf(stderr,"==checkAndREmoveOverdueMeds==\n");
+plista_med checkAndREmoveOverdueMeds(plista_med p, pthrds p_thrd ){
     if (p == NULL) return p;
     plista_med paux = p;
     do {
-        if (g_info.debugging) fprintf(stderr,"== med: %d, time: %d==\n", p->pid_medico, p->waitingForSignal);
+        if (g_info.debugging) fprintf(stderr,"=%d ", p->waitingForSignal);
         if (p->waitingForSignal > 21) {
             if (g_info.debugging) fprintf(stderr,"==No Life signal recieved from med %d, cleaning...==\n", p->pid_medico);
             paux = cleanDeadMed(paux, p->pid_medico);            
@@ -816,7 +907,8 @@ plista_cli cleanDeadCli(plista_cli p, pid_t pid){
 void tellClisToDie(plista_cli p){
     if (p == NULL) return;
     suicide Die_Clis;
-    Die_Clis.size=sizeof(Die_Clis);
+    Die_Clis.info = false;
+    Die_Clis.size=20001;
     char cFifoName[50];
     int res;
     int npc;
@@ -843,7 +935,8 @@ void tellClisToDie(plista_cli p){
 void tellMedsToDie(plista_med p){
     if (p == NULL) return;
     suicide Die_Meds;
-    Die_Meds.size=sizeof(Die_Meds);
+    Die_Meds.info = false;
+    Die_Meds.size=20001;
     char cFifoName[50];
     int res;
     int npm;

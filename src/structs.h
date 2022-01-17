@@ -49,8 +49,9 @@ typedef struct frequencia{
     short freq;
 }freq_tmed, *pfreq_tmed;
 
-typedef struct commitDie{
+typedef struct commitDie{ // struct ID: 20001
     unsigned short size;
+    bool info;
 }suicide, *psuicide;
 
 typedef struct how_to_connect{
